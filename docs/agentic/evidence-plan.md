@@ -1,5 +1,7 @@
 # Likedex Agentic Engineering evidence plan
 
+**Current capstone audit:** four practices have inspectable evidence: context engineering, SDD, verification, and loop engineering. The [final verification record](capstone-verification.md) records actual checks and links. No committed independent checker report exists, so Maker != Checker remains planned and is not claimed. The five-practice table and phase handoffs below preserve the original plan and historical status; they do not establish completion.
+
 Status: plan only. No tests, loop execution, checker findings, CI run, release submission or completed practice evidence is fabricated here. Claim exactly the five practices below unless later real evidence and human review justify another claim. The final Capstone PR should distinguish artifacts that exist from planned work and link exact commits/runs.
 
 | Practice | Artifact that will prove actual use | When naturally generated | Must not be fabricated | Likely link in final Capstone PR |

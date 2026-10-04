@@ -1,10 +1,10 @@
 # Likedex
 
-Likedex is a planned Chrome extension for browsing, searching, and revisiting a local mirror of your YouTube Liked Videos.
+Likedex is a Chrome extension for browsing, searching, and revisiting a local, read-only mirror of your YouTube Liked Videos.
 
-Its core principles are local-first browsing, read-only YouTube access, explicit library ownership, safe synchronization, and truthful status. Planned surfaces are a full-size Options page and a compact Side Panel, with Export Data, Clear Local Data, and Disconnect YouTube controls.
+Its core principles are local-first browsing, read-only YouTube access, explicit library ownership, safe synchronization, and truthful status. The full-size Options page and compact Side Panel share local search, filtering, sorting, and details. Export Data, Clear Local Data, and complete Disconnect YouTube controls remain planned.
 
-**Status:** Phase 7 replaces the Options placeholder with [explicit connection/onboarding and a local library experience](docs/options-ui.md), using Phase 6 [typed runtime messaging and MV3 lifecycle recovery](docs/runtime-lifecycle.md). Options supports available-only browsing, search, focused filters, seven sorts, 50-row pages, persistent wide detail and narrow detail/Back, canonical links and truthful sync/error states. [Live provider validation](docs/release/live-provider-validation.md) is **COMPLETE / APPROVED** from the human-run non-destructive observation. **Production Sync gate: ENABLED** by the committed-code release constant; explicit user Sync now reaches the existing authorization/synchronization path and retains every trust/pruning rule. **First real synchronization smoke: STILL PENDING.** Side Panel still displays its foundation placeholder; Settings/data controls and release submissions remain future work. Phase 8 has not begun; this is not release readiness.
+**Status:** Options and Side Panel provide the [working local library experience](docs/options-ui.md), using [typed runtime messaging and MV3 lifecycle recovery](docs/runtime-lifecycle.md). Options supports available-only browsing, focused filters, seven sorts, 50-row pages, wide detail and narrow detail/Back; Side Panel supports single-row expansion and focused detail with restored list context. [Live provider validation](docs/release/live-provider-validation.md) is **COMPLETE / APPROVED**, and the separately approved production Sync gate is **ENABLED**. The human reports a successful first production synchronization: 71 pages and 3,547 mirrored memberships, with approximately 3,403 available in primary browsing. [Capstone verification and evidence](docs/agentic/capstone-verification.md) records the source commit, passing checks, human-reported smoke, and remaining work. Data controls, independent release review, exact-package acceptance, Chrome Web Store submission, and public OAuth verification remain unfinished.
 
 ## Foundation development and verification
 
@@ -33,7 +33,7 @@ On Linux CI, install browser system dependencies with `npx playwright install --
 | `npm run build` | Production MV3 extension at `.output/chrome-mv3` |
 | `npm run check:build` | Assert approved release constant; inspect production OAuth/client/scope, permissions/CSP, key/derived Store ID, entries, icons and unwanted test/development/secret artifacts |
 | `npm run test:e2e` | Real production Options first run/Store ID/runtime/auth precondition/worker recovery plus separate Options and observation compositions for local interaction, clipboard, non-destructive observation, responsive keyboard paths and expiry; no live OAuth |
-| `npm run verify` | Lint → types → unit tests → build → artifact checks → browser shell smoke |
+| `npm run verify` | Lint → types → unit tests → production build/check → provider-validation build/check → Chromium E2E |
 
 The browser smoke requires `npm run build` first when run alone. It tests real extension page mounting, API configuration and the loaded extension ID; it does **not** exercise native Chrome toolbar clicking. For that manual check, load `.output/chrome-mv3` unpacked through `chrome://extensions`, open Options from the extension menu, pin Likedex, and click its toolbar icon to open the Side Panel. The Store public key in `wxt.config.ts` pins unpacked builds to the reserved ID `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`.
 
@@ -43,7 +43,7 @@ Production composition lives in `entrypoints/` and `src/`. Tests live exclusivel
 
 The original foundation icons are a white L on a dark square, checked in at 16, 32, 48 and 128 pixels. Regenerate them with `node scripts/generate-icons.mjs`. Final Store assets and exact-package smoke testing belong to later release work.
 
-The human owner completed the Chrome Web Store **draft** reservation with version **0.1.0**; [release documentation](docs/release/chrome-web-store.md#reserved-chrome-web-store-identity) records the reserved identity. The next upload must use a version greater than 0.1.0; Phase 7 keeps the current version. The human-supplied public project/client configuration is recorded in [OAuth readiness](docs/release/oauth-verification.md). Deterministic manifest checks establish configuration agreement, not live OAuth success or public verification. After human review/commit of Phase 7, the next phase is **Phase 8 — Side Panel Compact Experience**, recommended maker **GPT-6.1 Sol, High** for this handoff. Live observation, preserved evidence and explicit human approval must precede production sync/pruning enablement. Independent auth/storage/provider/lifecycle review remains required before release.
+The human owner completed the Chrome Web Store **draft** reservation with version **0.1.0**; [release documentation](docs/release/chrome-web-store.md#reserved-chrome-web-store-identity) records the reserved identity. The next upload must use a version greater than 0.1.0; the current package remains 0.1.0. The human-supplied public project/client configuration is recorded in [OAuth readiness](docs/release/oauth-verification.md). Deterministic manifest checks establish configuration agreement; the separately recorded live observation and human approval preceded production sync/pruning enablement. Independent auth/storage/provider/lifecycle review remains required before release. Current verification and human smoke reports do not establish public OAuth verification approval or Store release acceptance.
 
 ## Documentation
 
@@ -64,4 +64,4 @@ The human owner completed the Chrome Web Store **draft** reservation with versio
 - [Agentic Engineering evidence plan](docs/agentic/evidence-plan.md)
 - [Repository instructions](AGENTS.md)
 
-The release goal is a production-ready extension submitted to the Chrome Web Store and prepared for public Google OAuth verification. Product implementation, independent review, exact-package release checks and submissions remain planned. Likedex is being developed as an Agentic Engineering Capstone; evidence is recorded only as work actually occurs.
+The release goal is a production-ready extension submitted to the Chrome Web Store and prepared for public Google OAuth verification. Remaining data controls, independent review, exact-package release checks and submissions remain planned. Likedex is being developed as an Agentic Engineering Capstone; evidence is recorded only as work actually occurs.
