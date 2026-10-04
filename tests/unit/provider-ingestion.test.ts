@@ -50,8 +50,13 @@ describe('Provider request shape and streaming (AC-RECON-005/006)', () => {
     expect(events.at(-1)).toMatchObject({ progress: { pagesAccepted: 9, rawItems: 450, uniqueMembership: 450, estimatedTotal: 450 } });
     expect(JSON.stringify(events)).not.toContain(UNKNOWN_PLAYLIST_PRIVACY_STATUS);
   });
-  it('traverses 3547 memberships / 71 pages including unknown page-eight privacy with terminal-only trust', async () => {
+  it('accepts the live 3547 / 71-page chain with 47 terminal items and resultsPerPage 50', async () => {
     const generated = generatedLikesPages();
+    expect(generated.slice(0, 70).every((page) => page.membership.items.length === 50
+      && page.membership.pageInfo.resultsPerPage === 50 && page.next !== undefined)).toBe(true);
+    expect(generated[70]!.membership).toMatchObject({ items: expect.any(Array), pageInfo: { totalResults: 3547, resultsPerPage: 50 } });
+    expect(generated[70]!.membership.items).toHaveLength(47);
+    expect(generated[70]!.membership).not.toHaveProperty('nextPageToken');
     expect(generated[7]!.membership.items[16]).toMatchObject({ status: { privacyStatus: UNKNOWN_PLAYLIST_PRIVACY_STATUS } });
     const scan = setup(generated.flatMap((page) => [page.membership, page.hydration]));
     const iterator = scan.provider.enumerateLikedVideos(context, scan.abort.signal);
@@ -60,6 +65,8 @@ describe('Provider request shape and streaming (AC-RECON-005/006)', () => {
       expect(event).toMatchObject({ kind: 'page', pageNumber: index + 1,
         terminal: index === 70, progress: { rawItems: Math.min((index + 1) * 50, 3547) } });
       expect(isTrustedProviderCompletion(event)).toBe(false);
+      if (index === 70) expect(event).toMatchObject({ records: fixture.hydration.items.map((item) => ({ videoId: item.id })),
+        progress: { rawItems: 3547 } });
       if (index === 7) {
         expect(event).toMatchObject({ records: expect.arrayContaining([expect.objectContaining({
           videoId: videoId(367), membershipSourceIds: ['source-367'], likedAt: '2026-09-01T10:00:00.000Z',
@@ -147,6 +154,58 @@ describe('Provider request shape and streaming (AC-RECON-005/006)', () => {
   });
 });
 
+describe('Terminal resultsPerPage compatibility preserves complete-chain safety', () => {
+  it.each([
+    [46, 3547, 3547, 'pagination-premature-terminal'],
+    [48, 3547, 3547, 'pagination-count-exceeds-total'],
+    [47, 3548, 3548, 'pagination-premature-terminal'],
+    [47, 3546, 3547, 'pagination-total-changed'],
+  ] as const)('rejects 70 * 50 + %s terminal items with terminal total %s / initial total %s (%s)', async (count, terminalTotal, initialTotal, reason) => {
+    const generated = generatedLikesPages(initialTotal);
+    const terminal = membershipPage(Array.from({ length: count }, (_, index) => member(3501 + index)), undefined, terminalTotal, 50);
+    const scan = setup([...generated.slice(0, 70).flatMap((page) => [page.membership, page.hydration]), terminal]);
+    await expect(scan.run()).rejects.toMatchObject({ code: 'count-integrity', reason });
+    expect(pages(scan.events)).toHaveLength(70);
+    expect(scan.fetcher).toHaveBeenCalledTimes(141); // Rejected terminal never hydrates.
+    expect(scan.events.some(isTrustedProviderCompletion)).toBe(false);
+  });
+  it('rejects a 47-item premature terminal and a short terminal without known total', async () => {
+    const items = Array.from({ length: 47 }, (_, index) => member(index + 1));
+    for (const [total, reason] of [[48, 'pagination-premature-terminal'], [null, 'pagination-page-count-mismatch']] as const) {
+      const scan = setup([membershipPage(items, undefined, total, 50)]);
+      await expect(scan.run()).rejects.toMatchObject({ code: 'count-integrity', reason });
+      expect(scan.fetcher).toHaveBeenCalledTimes(1);
+      expect(scan.events.some(isTrustedProviderCompletion)).toBe(false);
+    }
+  });
+  it('follows continuation after 47 valid items; an intermediate resultsPerPage mismatch still fails', async () => {
+    const items = Array.from({ length: 47 }, (_, index) => member(index + 1));
+    const metas = Array.from({ length: 47 }, (_, index) => metadata(index + 1));
+    const scan = setup([membershipPage(items, 'next', 48), videosPage(metas),
+      membershipPage([member(48)], undefined, 48, 50), videosPage([metadata(48)])]);
+    const iterator = scan.provider.enumerateLikedVideos(context, scan.abort.signal);
+    const continuing = (await iterator.next()).value!;
+    expect(continuing).toMatchObject({ kind: 'page', terminal: false });
+    expect(isTrustedProviderCompletion(continuing)).toBe(false);
+    expect((await iterator.next()).value).toMatchObject({ kind: 'page', terminal: true });
+    expect(new URL(scan.fetcher.mock.calls[2]![0]).searchParams.get('pageToken')).toBe('next');
+    expect(isTrustedProviderCompletion((await iterator.next()).value)).toBe(true);
+    const mismatched = await rejectsWithoutCompletion(membershipPage(items, 'next', 48, 50), 'count-integrity');
+    expect(mismatched.events).toEqual([]);
+  });
+  it.each([['a', 'a'], ['a', 'b', 'a']])('still rejects repeated/cyclic tokens before a short terminal: %j', async (...tokens) => {
+    const scan = setup([...tokens.flatMap((token, index) => [membershipPage([member(index + 1)], token, null), videosPage([metadata(index + 1)])]),
+      membershipPage([member(10)], undefined, tokens.length + 1, 50), videosPage([metadata(10)])]);
+    await expect(scan.run()).rejects.toMatchObject({ code: 'pagination-integrity',
+      reason: tokens.length === 2 ? 'pagination-token-repeat' : 'pagination-token-cycle' });
+    expect(scan.fetcher).toHaveBeenCalledTimes(tokens.length * 2 - 1);
+    expect(scan.events.some(isTrustedProviderCompletion)).toBe(false);
+  });
+  it('keeps the explicit trusted-empty resultsPerPage zero safeguard', async () => {
+    await rejectsWithoutCompletion(membershipPage([], undefined, 0, 50), 'count-integrity');
+  });
+});
+
 describe('Fail-closed membership validation (AC-RECON-003/004/007)', () => {
   it.each(invalidMembershipCases())('diagnostics preserve production rejection for $reason', async ({ item, reason }) => {
     const production = setup([membershipPage([item])]);
@@ -183,6 +242,7 @@ describe('Fail-closed membership validation (AC-RECON-003/004/007)', () => {
     { ...membershipPage([]), items: undefined }, { ...membershipPage([]), items: {} },
     { ...membershipPage([]), kind: 'wrong' }, { ...membershipPage([]), pageInfo: undefined },
     { ...membershipPage([]), pageInfo: { resultsPerPage: -1 } },
+    ...[1.5, 51, '50', null].map((resultsPerPage) => ({ ...membershipPage([]), pageInfo: { resultsPerPage, totalResults: 0 } })),
     { ...membershipPage([]), pageInfo: { resultsPerPage: 0, totalResults: 1.5 } },
     { ...membershipPage([]), nextPageToken: '' }, { ...membershipPage([]), nextPageToken: null },
     { ...membershipPage([]), nextPageToken: 42 },

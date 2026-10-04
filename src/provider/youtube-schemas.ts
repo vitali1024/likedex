@@ -98,7 +98,14 @@ export function validateMembershipPage(value: unknown, playlistId: string,
   if (!envelope.success) throw new ProviderError('malformed-response');
   const page = envelope.data;
   envelopeObserved?.(page);
-  if (page.pageInfo.resultsPerPage !== page.items.length) throw new ProviderError('count-integrity', 'pagination-page-count-mismatch');
+  // Live Likes terminal pages can retain the requested page size in metadata.
+  // Only this short, nonempty terminal shape is relaxed; ingestion must still
+  // reconcile its actual memberships against a stable known chain total.
+  const shortTerminal = page.nextPageToken === undefined && page.items.length > 0
+    && page.items.length < page.pageInfo.resultsPerPage;
+  if (page.pageInfo.resultsPerPage !== page.items.length && !shortTerminal) {
+    throw new ProviderError('count-integrity', 'pagination-page-count-mismatch');
+  }
   const memberships: Membership[] = [];
   let firstFailure: ProviderError | undefined;
   const rejectItem = (raw: unknown, index: number, reason: MembershipItemReason | 'membership-item-invalid',
@@ -128,7 +135,7 @@ export function validateMembershipPage(value: unknown, playlistId: string,
   }
   // Validation-only collection never skips bad membership to return a page.
   if (firstFailure) throw firstFailure;
-  return { memberships, nextPageToken: page.nextPageToken,
+  return { memberships, nextPageToken: page.nextPageToken, resultsPerPage: page.pageInfo.resultsPerPage,
     estimatedTotal: page.pageInfo.totalResults ?? null };
 }
 

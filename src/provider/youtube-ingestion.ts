@@ -151,6 +151,11 @@ export class YouTubeLikedVideosProvider {
         if (total !== null && rawItems > total) throw new ProviderError('count-integrity', 'pagination-count-exceeds-total');
         const terminal = page.nextPageToken === undefined;
         if (terminal && total !== null && rawItems !== total) throw new ProviderError('count-integrity', 'pagination-premature-terminal');
+        // The terminal metadata exception needs actual cumulative count proof;
+        // absent totals cannot justify relaxing the old page-count safeguard.
+        if (terminal && page.memberships.length < page.resultsPerPage && total === null) {
+          throw new ProviderError('count-integrity', 'pagination-page-count-mismatch');
+        }
         // A zero total is required for the trusted-empty control case.
         if (terminal && rawItems === 0 && total !== 0) throw new ProviderError('count-integrity', 'pagination-empty-total-unconfirmed');
         const pageIds = new Set<string>();

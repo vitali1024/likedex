@@ -11,10 +11,11 @@ export function member(index = 1, id = videoId(index)) {
       publishedAt: '2026-09-01T10:00:00Z', resourceId: { kind: 'youtube#video', videoId: id } },
     contentDetails: { videoId: id }, status: { privacyStatus: 'private' } };
 }
-export function membershipPage(items: unknown[] = [member()], nextPageToken?: string, totalResults: number | null = items.length) {
+export function membershipPage(items: unknown[] = [member()], nextPageToken?: string, totalResults: number | null = items.length,
+  resultsPerPage = items.length) {
   return { kind: 'youtube#playlistItemListResponse', items,
     ...(nextPageToken === undefined ? {} : { nextPageToken }),
-    pageInfo: { resultsPerPage: items.length, ...(totalResults === null ? {} : { totalResults }) } };
+    pageInfo: { resultsPerPage, ...(totalResults === null ? {} : { totalResults }) } };
 }
 export function metadata(index = 1) {
   return { kind: 'youtube#video', id: videoId(index),
@@ -32,7 +33,7 @@ export function generatedLikesPages(total = 3547) {
     const indices = Array.from({ length: Math.min(50, total - pageIndex * 50) }, (_, index) => pageIndex * 50 + index + 1);
     const next = pageIndex + 1 < Math.ceil(total / 50) ? `opaque +/= ${pageIndex + 1} ?&` : undefined;
     return { next, membership: membershipPage(indices.map((index) => index === 367
-      ? { ...member(index), status: { privacyStatus: UNKNOWN_PLAYLIST_PRIVACY_STATUS } } : member(index)), next, total),
+      ? { ...member(index), status: { privacyStatus: UNKNOWN_PLAYLIST_PRIVACY_STATUS } } : member(index)), next, total, 50),
       hydration: videosPage(indices.map((index) => metadata(index))) };
   });
 }

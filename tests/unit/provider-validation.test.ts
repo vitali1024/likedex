@@ -139,7 +139,7 @@ describe('Human release observation is non-destructive', () => {
     expect(scan.chrome.getAuthToken.mock.calls.every(([args]) => args?.interactive === false)).toBe(true);
     expect(resultSchema.safeParse(result).success).toBe(true);
   });
-  it('observes 3547 memberships including unknown page-eight privacy without mutation', async () => {
+  it('observes the live 3547 chain with 47 terminal items / resultsPerPage 50 without mutation', async () => {
     const generated = generatedLikesPages();
     const scan = setup([channelResponse(), ...generated.flatMap((page) => [page.membership, page.hydration])]);
     const result = await scan.run();
@@ -153,12 +153,30 @@ describe('Human release observation is non-destructive', () => {
     expect(result.enumerationDiagnostic.pageChain[7]).toMatchObject({ pageOrdinal: 8, tokenRelation: 'fresh',
       itemCount: 50, hydrationRequestedCount: 50, hydrationReturnedCount: 50 });
     expect(result.enumerationDiagnostic.pageChain.at(-1)).toMatchObject({ pageOrdinal: 71, tokenRelation: 'none',
-      itemCount: 47, hydrationRequestedCount: 47, hydrationReturnedCount: 47 });
+      itemCount: 47, resultsPerPage: 50, totalResults: 3547, hadNextPageToken: false,
+      hydrationRequestedCount: 47, hydrationReturnedCount: 47 });
+    expect(JSON.stringify(result)).not.toContain('pagination-page-count-mismatch');
     for (const secret of [UNKNOWN_PLAYLIST_PRIVACY_STATUS, TOKEN_A, 'owner-a', 'likes-owner-a', 'source-1', videoId(), 'Video 1', 'opaque +/=']) {
       expect(JSON.stringify(result)).not.toContain(secret);
     }
     expect(resultSchema.safeParse({ ...result, enumerationDiagnostic: { ...result.enumerationDiagnostic,
       pageChain: [{ ...result.enumerationDiagnostic.pageChain[0], pageToken: 'private' }] } }).success).toBe(false);
+  });
+  it.each([
+    [46, 'pagination-premature-terminal', 3546],
+    [48, 'pagination-count-exceeds-total', 3548],
+  ] as const)('reports an untrusted live-chain terminal of %s items (%s)', async (count, reasonCode, observedMembershipCount) => {
+    const generated = generatedLikesPages();
+    const scan = setup([channelResponse(), ...generated.slice(0, 70).flatMap((page) => [page.membership, page.hydration]),
+      membershipPage(Array.from({ length: count }, (_, index) => member(3501 + index)), undefined, 3547, 50)]);
+    const result = await scan.run();
+    expect(result).toMatchObject({ status: 'failed', summary: { pages: 70, rawMemberships: 3500,
+      hydrationPages: 70, hydrated: 3500, trustedCompletion: false },
+      enumerationDiagnostic: { reasonCode, observedMembershipCount, expectedTotal: 3547, reportedTotal: 3547,
+        lastResponseHadNextPageToken: false, internalStop: 'none', invalidItems: [] } });
+    expect(result.enumerationDiagnostic.pageChain.at(-1)).toMatchObject({ pageOrdinal: 71, itemCount: count,
+      resultsPerPage: 50, hydrationRequestedCount: null, hydrationReturnedCount: null });
+    expect(scan.fetcher).toHaveBeenCalledTimes(142);
   });
   it('distinguishes seven accepted pages from a rejected eighth premature terminal', async () => {
     const generated = generatedLikesPages();

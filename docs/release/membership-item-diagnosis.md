@@ -1,5 +1,7 @@
 # Page-eight playlist-item privacy compatibility correction
 
+Subsequent human evidence proved a separate terminal pagination compatibility defect after the privacy fix: page 71 had 47 valid memberships, resultsPerPage 50, no continuation and cumulative=stable total 3,547. The [terminal correction and current retry](provider-pagination-diagnosis.md) supersede this document's retry/build hashes. The privacy correction below remains in place; successful complete live validation remains PENDING and production Sync remains closed.
+
 Inspection date: 2026-10-04. Clean source baseline: `1b8b6e5` (`chore: expose membership validation diagnostics`). The human request authorizes this narrow provider-contract correction despite historical specifications-only wording in AGENTS.md. No staging/commit, Phase 8 work, production Sync enablement or pruning is authorized or performed. This is maker verification, not independent release review.
 
 ## Proven live failure

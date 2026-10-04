@@ -1,4 +1,58 @@
-# Diagnosis of the reported 350 / 3,547 observation
+# Terminal Likes pagination compatibility correction
+
+## Current proven terminal failure — 2026-10-04
+
+Clean source baseline: `27a992d` (`fix: tolerate unknown playlist item privacy status`). The human authorized this focused compatibility correction. No Phase 8 work, production Sync enablement, reconciliation/pruning, staging or commit is included. This is maker-local verification, not independent release review or a new agent-run live observation.
+
+The human-provided non-destructive observation traversed 70 pages of 50 memberships with fresh continuation tokens, then a structurally valid terminal page of 47 memberships. Every page reported stable `totalResults=3547`; page 71 retained `resultsPerPage=50`, had no next token, and brought actual observed membership to 3,547. No invalid items or internal stop occurred. No cap, cycle or changing total was encountered in the reported chain. The equality `70 * 50 + 47 = 3547` proves count coherence for this observed API-visible enumeration. Page 71 failed with `pagination-page-count-mismatch` before hydration solely because the old validator required `items.length === pageInfo.resultsPerPage` on every page. Observation time, Chrome version and original build hashes were not supplied; none is invented.
+
+Live YouTube therefore demonstrated that the final Likes page can contain fewer actual items than resultsPerPage. The corrected rule permits this short nonempty terminal shape only when the validated chain has no continuation, every item/playlist association is valid, supplied totals are stable, a total is known and cumulative actual membership equals it, with no integrity/provider/internal-stop failure. Hydration must succeed and the consumer must resume under valid session gates before authentic completion is issued. resultsPerPage retains its original integer/range schema and unchanged diagnostic value; it is metadata rather than terminal completeness proof.
+
+Continuing-page equality remains unchanged. A 47-item continuing page with resultsPerPage 47 follows its token, never completes early; a 47/50 continuing mismatch still fails. The unproven reverse mismatch and explicit empty control retain their safeguards. Matching-page nonempty scans with absent totals retain existing policy; a short-terminal metadata mismatch without any known total fails. Under-count, over-count, premature missing token, changing totals, duplicate source IDs, repeated/cyclic tokens, empty continuation, malformed structure/items, provider/hydration failure and session/cancellation stops still prevent completion.
+
+The generated primary regression now exactly models 3,547 / 71 pages with resultsPerPage 50 throughout. It verifies all 47 terminal hydration IDs and records, cumulative count, authentic WeakSet-backed `TrustedProviderCompletion` and terminal-only issuance. Release observation verifies trustedCompletion true, reason `trusted-complete`, observed=expected=reported 3,547, page 71 itemCount 47/resultsPerPage 50/no token and requested/returned hydration 47, without local-store mutation or `pagination-page-count-mismatch`. Full-chain 3,546 and 3,548 negatives remain untrusted before terminal hydration; a stable greater total, changed total and token/integrity regressions also fail. Existing diagnostics already expose both counts and continuation state, so no new anomaly field or successful-error presentation is needed.
+
+**Live validation remains PENDING until the human reruns the complete corrected observation and the evidence is assessed. Production Sync gate remains false/closed; no production approval is claimed.** Follow the current retry at the end of this document. Earlier sections below are historical evidence; their uncertainty, verification counts, build hashes and suggested commit do not identify this correction.
+
+## Current maker verification and required human retry
+
+Toolchain observed: Node 24.19.0 / npm 11.17.0. No real account/API access or independent review was performed by this task.
+
+| Requested command | Final result |
+|---|---|
+| `npx vitest run tests/unit/provider-ingestion.test.ts tests/unit/provider-validation.test.ts` | PASS: 242 tests / two files |
+| `npm run lint` | PASS: zero lint warnings |
+| `npm run typecheck` | PASS |
+| `npm run test` | PASS: 540 tests / 13 files |
+| `npm run verify:sync` | PASS: 278 tests / five files |
+| `npm run build` | PASS |
+| `npm run check:build` | PASS |
+| `npm run build:provider-validation` | PASS |
+| `npm run check:provider-validation` | PASS |
+| `npm run test:e2e` | PASS: nine Chromium tests |
+| `npm run verify` | PASS: exit 0, including 540 unit and nine browser tests |
+| `npm audit` | PASS: zero vulnerabilities; no audit fix |
+| `git diff --check` | PASS |
+
+The first focused run caught a negative fixture changing total to 3,548 while intending a stable greater-total case. The existing total-change guard correctly fired. The fixture now uses stable 3,548 across that chain; the separate changed-total case remains explicit. No implementation/trust guard was weakened to fix the fixture. Initial restricted browser launch failed with `spawn EPERM`; permitted outside-sandbox standalone E2E and authoritative verify passed using isolated temporary profiles. Restricted audit could not reach the advisory endpoint/write cache logs; the permitted requested audit passed. Notices were Git LF-to-CRLF and Playwright NO_COLOR/FORCE_COLOR. These are local maker results, not production approval.
+
+Source identity for this retry: `27a992d` **plus this reviewed unstaged patch**. Validation package: `C:\Dev\likedex\.output\provider-validation\chrome-mv3`.
+
+Final SHA-256:
+
+- `manifest.json`: `4D87960FBABDE7E7A133E5A7D637F323506D3C2476B628AF40966EF8E448A3FF`
+- `background.js`: `488D91B4E0585B1859C83BC9C00BA3D9C6DD374A6C3FC86072E20CCB4AA0D805`
+
+1. Review the patch. In `chrome://extensions`, reload the existing unpacked validation package at the path above, or load it in a dedicated profile with no other enabled installation of the same ID. Close old Options/observation tabs and reopen **Details → Extension options**. Load no TEST COMPOSITION directory.
+2. Confirm **Likedex — RELEASE VALIDATION ONLY**, version **0.1.0**, ID **mmefiakgfhddiojfdnkfpfpbkgbfgkgj**, and the hashes above. Retain existing OAuth client `875739161327-ut8ca2iocubeq8a2a2eleu9kcdu6d1ue.apps.googleusercontent.com`, project `likedex-extension-prod`, scope `https://www.googleapis.com/auth/youtube.readonly` and permissions.
+3. Confirm connected/read-only and the intended channel locally. If Connect is offered, record the agreement if required and explicitly **Connect YouTube** once. Retain an eligible existing connection. Stop on connection/precondition failure and report only its sanitized diagnostic.
+4. Open **non-destructive provider observation**, close other Likedex pages, then click **Observe provider without syncing** once. Keep that page open until the final result. Do not click normal Sync or change likes.
+5. Copy the entire final sanitized JSON within ten minutes of the last update. For an unchanged 3,547-item live chain, confirm 71 accepted/hydrated pages, terminal itemCount 47/resultsPerPage 50/no next token, hydrationRequestedCount 47 (returned count may be lower if valid metadata omissions occur), observed=expected=reported 3,547, empty invalidItems, internalStop none, `reasonCode: "trusted-complete"`, `status: "success"`, `bootstrapValidated: true` and `trustedCompletion: true`. Report actual counts if the library changed; do not force the old size. Preserve summary, full pageChain, reasons, counts, hydration facts, internalStop and optional auth diagnostic. Record actual Asia/Jerusalem time, Chrome version, source base plus patch/build hashes and unpacked install mode. Share no raw bodies, IDs, titles, credentials, opaque tokens, HAR or DevTools output.
+6. Report evidence for assessment, then disable the validation package per the [runbook](provider-observation-runbook.md). Failure remains failure; stop on a new contradiction. Successful observation still needs a separate explicit human approval and reviewed enablement change. Production Sync/pruning remains gated, live validation PENDING, and Phase 8 has not begun.
+
+All changes remain unstaged/uncommitted. Suggested human commit after review: `fix: accept coherent terminal Likes page`. No automatic commit.
+
+## Historical diagnosis of the reported 350 / 3,547 observation
 
 Baseline: clean `0ef0484766dbb3ed088040fe926d744c9cf58166` on 2026-10-04. This is focused diagnosis and release-only instrumentation. No live account/API call, phase advancement, production enablement, source-strategy change, pruning, staging or commit was performed here. The supplied request authorizes this narrow implementation inspection despite the historical specifications-only wording in AGENTS.md.
 
@@ -18,7 +72,7 @@ A generated regression reproduces this summary with seven valid 50-item pages fo
 
 | Location / internal code | Exact condition | Validation reason |
 |---|---|---|
-| `validateMembershipPage` / count-integrity | resultsPerPage differs from items.length | pagination-page-count-mismatch |
+| `validateMembershipPage` / count-integrity | resultsPerPage differs from items.length, except short nonempty terminal shape; ingestion additionally rejects that exception without a known total | pagination-page-count-mismatch |
 | Same / unmappable-membership | Any item fails the required resource schema: kind, containers, source/video ID syntax, field types, privacy enum, position/date types | membership-item-invalid |
 | Same / unmappable-membership | Item playlist ID differs from requested Likes playlist | membership-playlist-conflict |
 | Same / unmappable-membership | Both snippet and contentDetails video IDs absent | membership-video-id-missing |
@@ -85,7 +139,7 @@ Restricted `npm audit` could not reach the advisory endpoint/write its cache log
 
 Reviewed unstaged build: validation manifest SHA-256 `4D87960FBABDE7E7A133E5A7D637F323506D3C2476B628AF40966EF8E448A3FF`; validation background SHA-256 `ABF940886DBF40D31E1A01264E00B1EF28A2D265A4A02A78B99CCAC8B6433198`. The manifest is unchanged; the background identifies this uncommitted diagnostic patch. No pagination implementation fix was justified. Suggested human commit after review: `chore: expose sanitized provider pagination diagnostics`.
 
-## Required next human observation
+## Historical next human observation (superseded)
 
 One more live observation is required. This task follows case C (static evidence cannot distinguish the live branch). The full chain/failed response semantics now distinguish a provider-premature terminal, repeated/cyclic token, empty continuation, changing totals, bad membership/count/source evidence or an internal timeout/budget. A contradicted source assumption requires a separate human/spec decision; diagnostic failure cannot approve production.
 
