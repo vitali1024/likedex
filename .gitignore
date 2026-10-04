@@ -1,0 +1,16 @@
+node_modules/
+.wxt/
+.output/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.DS_Store
+Thumbs.db
