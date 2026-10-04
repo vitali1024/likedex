@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ProviderError } from './errors';
+import type { MembershipItemDiagnostic, MembershipItemReason } from './diagnostics';
 
 export const identifierSchema = z.string().min(1).regex(/^[A-Za-z0-9_-]+$/);
 export const videoIdSchema = z.string().regex(/^[A-Za-z0-9_-]{11}$/);
@@ -36,29 +37,95 @@ export function canonicalTimestamp(value: string | undefined): string | null {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
+function objectFields(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+// Fixed paths/reasons only. Zod messages, issue payloads and provider values
+// never leave this boundary; unknown future schema paths have a safe fallback.
+function itemSchemaReasons(issues: readonly z.core.$ZodIssue[], raw: unknown): MembershipItemReason[] {
+  const item = objectFields(raw); const snippet = objectFields(item.snippet);
+  return [...new Set(issues.map((issue): MembershipItemReason => {
+    switch (issue.path.join('.')) {
+      case '': return 'membership-item-not-object';
+      case 'kind': return 'membership-kind-invalid';
+      case 'id': return item.id === undefined ? 'membership-playlist-item-id-missing' : 'membership-playlist-item-id-invalid';
+      case 'snippet': return item.snippet === undefined ? 'membership-snippet-missing' : 'membership-snippet-invalid';
+      case 'snippet.playlistId': return snippet.playlistId === undefined ? 'membership-playlist-id-missing' : 'membership-playlist-id-invalid';
+      case 'snippet.resourceId': return snippet.resourceId === undefined ? 'membership-resource-id-missing' : 'membership-resource-id-invalid';
+      case 'snippet.resourceId.kind': return 'membership-resource-kind-invalid';
+      case 'snippet.resourceId.videoId': return 'membership-snippet-video-id-invalid';
+      case 'snippet.publishedAt': return 'membership-liked-at-type-invalid';
+      case 'snippet.position': return 'membership-position-invalid';
+      case 'contentDetails': return item.contentDetails === undefined ? 'membership-content-details-missing' : 'membership-content-details-invalid';
+      case 'contentDetails.videoId': return 'membership-content-video-id-invalid';
+      case 'status': return item.status === undefined ? 'membership-status-missing' : 'membership-status-invalid';
+      case 'status.privacyStatus': return 'membership-privacy-status-invalid';
+      default: return 'membership-schema-invalid';
+    }
+  }))];
+}
+
+function itemDiagnostic(raw: unknown, playlistId: string, itemOrdinal: number,
+  reasonCodes: MembershipItemReason[]): Omit<MembershipItemDiagnostic, 'pageOrdinal'> {
+  const item = objectFields(raw); const snippet = objectFields(item.snippet);
+  const resource = objectFields(snippet.resourceId); const details = objectFields(item.contentDetails);
+  const status = objectFields(item.status);
+  const present = (value: unknown) => value !== undefined;
+  const valid = (value: unknown, schema: z.ZodType) => value === undefined ? null : schema.safeParse(value).success;
+  return { itemOrdinal, reasonCodes, fieldPresence: {
+    itemKind: present(item.kind), playlistItemId: present(item.id), snippet: present(item.snippet),
+    playlistId: present(snippet.playlistId), resourceId: present(snippet.resourceId), resourceKind: present(resource.kind),
+    snippetVideoId: present(resource.videoId), contentDetails: present(item.contentDetails), contentVideoId: present(details.videoId),
+    publishedAt: present(snippet.publishedAt), position: present(snippet.position), status: present(item.status), privacyStatus: present(status.privacyStatus),
+  }, itemKindIsPlaylistItem: item.kind === undefined ? null : item.kind === 'youtube#playlistItem',
+  playlistItemIdValid: valid(item.id, identifierSchema), playlistIdValid: valid(snippet.playlistId, identifierSchema),
+  resourceKindIsVideo: resource.kind === undefined ? null : resource.kind === 'youtube#video',
+  snippetVideoIdValid: valid(resource.videoId, videoIdSchema), contentVideoIdValid: valid(details.videoId, videoIdSchema),
+  videoIdsAgree: typeof resource.videoId === 'string' && typeof details.videoId === 'string' ? resource.videoId === details.videoId : null,
+  playlistIdMatchesExpected: typeof snippet.playlistId === 'string' ? snippet.playlistId === playlistId : null,
+  likedAtParses: snippet.publishedAt === undefined ? null : typeof snippet.publishedAt === 'string' && canonicalTimestamp(snippet.publishedAt) !== null,
+  positionValid: valid(snippet.position, count), privacyStatusRecognized: valid(status.privacyStatus, privacy) };
+}
+
 // Internal envelope hook runs before trust checks, so a rejected page can be
 // diagnosed. Its opaque token stays inside ingestion; only safe facts leave it.
 export function validateMembershipPage(value: unknown, playlistId: string,
-  envelopeObserved?: (page: z.infer<typeof playlistEnvelope>) => void) {
+  envelopeObserved?: (page: z.infer<typeof playlistEnvelope>) => void,
+  itemObserved?: (item: Omit<MembershipItemDiagnostic, 'pageOrdinal'>) => void) {
   const envelope = playlistEnvelope.safeParse(value);
   if (!envelope.success) throw new ProviderError('malformed-response');
   const page = envelope.data;
   envelopeObserved?.(page);
   if (page.pageInfo.resultsPerPage !== page.items.length) throw new ProviderError('count-integrity', 'pagination-page-count-mismatch');
-  const memberships = page.items.map((raw): Membership => {
+  const memberships: Membership[] = [];
+  let firstFailure: ProviderError | undefined;
+  const rejectItem = (raw: unknown, index: number, reason: MembershipItemReason | 'membership-item-invalid',
+    issues?: readonly z.core.$ZodIssue[]) => {
+    if (itemObserved) {
+      const reasons = issues ? itemSchemaReasons(issues, raw)
+        : [reason === 'membership-item-invalid' ? 'membership-schema-invalid' : reason];
+      itemObserved(itemDiagnostic(raw, playlistId, index + 1, reasons));
+      reason = reasons[0]!;
+    }
+    const failure = new ProviderError('unmappable-membership', reason);
+    if (!itemObserved) throw failure; // Preserve production's immediate failure.
+    firstFailure ??= failure;
+  };
+  for (const [index, raw] of page.items.entries()) {
     const result = playlistItem.safeParse(raw);
-    if (!result.success) throw new ProviderError('unmappable-membership');
+    if (!result.success) { rejectItem(raw, index, 'membership-item-invalid', result.error.issues); continue; }
     const item = result.data;
     const snippetId = item.snippet.resourceId.videoId;
     const detailsId = item.contentDetails.videoId;
-    if (item.snippet.playlistId !== playlistId) throw new ProviderError('unmappable-membership', 'membership-playlist-conflict');
-    if (snippetId === undefined && detailsId === undefined) throw new ProviderError('unmappable-membership', 'membership-video-id-missing');
-    if (snippetId !== undefined && detailsId !== undefined && snippetId !== detailsId) {
-      throw new ProviderError('unmappable-membership', 'membership-video-id-conflict');
-    }
-    return { sourceId: item.id, videoId: snippetId ?? detailsId!,
-      likedAt: canonicalTimestamp(item.snippet.publishedAt), position: item.snippet.position ?? null };
-  });
+    const reason = item.snippet.playlistId !== playlistId ? 'membership-playlist-conflict'
+      : snippetId === undefined && detailsId === undefined ? 'membership-video-id-missing'
+        : snippetId !== undefined && detailsId !== undefined && snippetId !== detailsId ? 'membership-video-id-conflict' : null;
+    if (reason) { rejectItem(raw, index, reason); continue; }
+    memberships.push({ sourceId: item.id, videoId: snippetId ?? detailsId!,
+      likedAt: canonicalTimestamp(item.snippet.publishedAt), position: item.snippet.position ?? null });
+  }
+  // Validation-only collection never skips bad membership to return a page.
+  if (firstFailure) throw firstFailure;
   return { memberships, nextPageToken: page.nextPageToken,
     estimatedTotal: page.pageInfo.totalResults ?? null };
 }

@@ -4,7 +4,7 @@ import { authenticatedBootstrapSchema } from '../domain/authentication';
 import { videoSchema, type Freshness, type MirroredVideo } from '../domain/contracts';
 import { retentionDeadline } from '../domain/freshness';
 import { ProviderError, providerFailure } from './errors';
-import type { MembershipPageDiagnostic } from './diagnostics';
+import type { MembershipItemDiagnostic, MembershipPageDiagnostic } from './diagnostics';
 import { bestThumbnail, durationSeconds, canonicalTimestamp, validateMembershipPage, validateVideos,
   type Membership, type VideoMetadata } from './youtube-schemas';
 
@@ -100,7 +100,8 @@ function mapRecord(member: Membership, sourceIds: string[], metadata: VideoMetad
 
 export class YouTubeLikedVideosProvider {
   constructor(private readonly requests: Requests,
-    private readonly observePage?: (page: MembershipPageDiagnostic | null) => void) {}
+    private readonly observePage?: (page: MembershipPageDiagnostic | null) => void,
+    private readonly observeItem?: (item: MembershipItemDiagnostic) => void) {}
 
   // A page authorizes only prospective safe updates. Returning early, aborting,
   // or any failure leaves the caller without a terminal completeness capability.
@@ -133,7 +134,7 @@ export class YouTubeLikedVideosProvider {
               : token === next ? 'repeated' : tokens.has(token) ? 'cyclic' : pages === 0 ? 'first' : 'fresh',
             hydrationRequestedCount: null, hydrationReturnedCount: null };
           this.observePage?.({ ...diagnostic });
-        }));
+        }, this.observeItem ? (item) => this.observeItem!({ ...item, pageOrdinal: pages + 1 }) : undefined));
         const membershipAt = session.observedAt();
         if (page.nextPageToken !== undefined) {
           if (tokens.has(page.nextPageToken)) throw new ProviderError('pagination-integrity',

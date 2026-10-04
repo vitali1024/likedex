@@ -7,7 +7,8 @@ import { YouTubeLikedVideosProvider, isTrustedProviderCompletion, type ProviderE
 import { canonicalTimestamp, durationSeconds } from '@/src/provider/youtube-schemas';
 import { videoSchema } from '@/src/domain/contracts';
 import { TOKEN_A, TOKEN_B, bootstrap, channelResponse, chromeIdentity, held, json, timing } from '../fixtures/authentication';
-import { context, member, membershipPage, metadata, videoId, videosPage, generatedLikesPages } from '../fixtures/provider';
+import { context, member, membershipPage, metadata, videoId, videosPage, generatedLikesPages, invalidMembershipCases } from '../fixtures/provider';
+import type { MembershipItemDiagnostic } from '@/src/provider/diagnostics';
 
 function setup(bodies: unknown[] = [membershipPage(), videosPage()]) {
   const chrome = chromeIdentity();
@@ -123,6 +124,37 @@ describe('Provider request shape and streaming (AC-RECON-005/006)', () => {
 });
 
 describe('Fail-closed membership validation (AC-RECON-003/004/007)', () => {
+  it.each(invalidMembershipCases())('diagnostics preserve production rejection for $reason', async ({ item, reason }) => {
+    const production = setup([membershipPage([item])]);
+    await expect(production.run()).rejects.toMatchObject({ code: 'unmappable-membership', detail: { category: 'untrusted-enumeration' } });
+    expect(production.events).toEqual([]);
+    const validation = setup([membershipPage([item])]);
+    const invalid: MembershipItemDiagnostic[] = [];
+    const provider = new YouTubeLikedVideosProvider(validation.requests, undefined, (item) => invalid.push(item));
+    const run = async () => { for await (const event of provider.enumerateLikedVideos(context, validation.abort.signal)) validation.events.push(event); };
+    await expect(run()).rejects.toMatchObject({ code: 'unmappable-membership', reason });
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]).toMatchObject({ pageOrdinal: 1, itemOrdinal: 1, reasonCodes: [reason] });
+    expect(validation.fetcher).toHaveBeenCalledTimes(1);
+    expect(validation.events).toEqual([]);
+  });
+  it.each([
+    ['snippet-only identity', { ...member(), contentDetails: {} }],
+    ['content-only identity', { ...member(), snippet: { ...member().snippet, resourceId: { kind: 'youtube#video' } } }],
+    ['both IDs agree', member()],
+    ['no videoPublishedAt or playlist title/thumbnail/channel metadata', { ...member(), status: {} }],
+    ['unusable liked date string', { ...member(), snippet: { ...member().snippet, publishedAt: 'private-date-sentinel' } }],
+    ['absent liked date and position', { ...member(), snippet: { ...member().snippet, publishedAt: undefined, position: undefined } }],
+  ])('retains existing trustworthy membership policy: %s', async (_label, item) => {
+    const scan = setup([membershipPage([item]), videosPage()]);
+    const invalid: MembershipItemDiagnostic[] = [];
+    const provider = new YouTubeLikedVideosProvider(scan.requests, undefined, (item) => invalid.push(item));
+    for await (const event of provider.enumerateLikedVideos(context, scan.abort.signal)) scan.events.push(event);
+    expect(isTrustedProviderCompletion(scan.events.at(-1))).toBe(true);
+    expect(pages(scan.events)[0]!.records[0]!.videoId).toBe(videoId());
+    expect(invalid).toEqual([]);
+    expect(scan.fetcher).toHaveBeenCalledTimes(2);
+  });
   it.each([null, [], {}, { kind: 'youtube#playlistItemListResponse' },
     { ...membershipPage([]), items: undefined }, { ...membershipPage([]), items: {} },
     { ...membershipPage([]), kind: 'wrong' }, { ...membershipPage([]), pageInfo: undefined },

@@ -2,7 +2,7 @@ import { AuthenticationError, assertNotAborted } from '../../src/auth/errors';
 import type { GoogleAuthorizationRequests } from '../../src/auth/google-requests';
 import type { LibrarySnapshot } from '../../src/domain/contracts';
 import { ProviderError } from '../../src/provider/errors';
-import type { MembershipPageDiagnostic } from '../../src/provider/diagnostics';
+import type { MembershipItemDiagnostic, MembershipPageDiagnostic } from '../../src/provider/diagnostics';
 import { isTrustedProviderCompletion, YouTubeLikedVideosProvider, type IngestionContext } from '../../src/provider/youtube-ingestion';
 import { resultSchema, type ValidationResult, type ValidationSummary, type enumerationDiagnosticSchema } from './contracts';
 import type { z } from 'zod';
@@ -20,13 +20,14 @@ export async function observeProvider(requests: Requests, read: () => Promise<Pr
     duplicateVideoItems: 0, estimatedTotal: null, hydrationPages: 0, hydrated: 0, lookupOmitted: 0,
     withoutRichMetadata: 0, unavailable: 0, unknownAvailability: 0 };
   const pageChain: MembershipPageDiagnostic[] = [];
+  const invalidItems: MembershipItemDiagnostic[] = [];
   let lastResponseObserved = false;
   const enumerationDiagnostic = (reasonCode: z.infer<typeof enumerationDiagnosticSchema>['reasonCode'],
     internalStop: z.infer<typeof enumerationDiagnosticSchema>['internalStop'] = 'none') => {
     const last = pageChain.at(-1);
     // These count envelope items, including a rejected response. They do not
     // claim accepted/mappable membership; summary retains accepted progress.
-    return { pageChain, reasonCode, observedMembershipCount: pageChain.reduce((sum, page) => sum + page.itemCount, 0),
+    return { pageChain, invalidItems, reasonCode, observedMembershipCount: pageChain.reduce((sum, page) => sum + page.itemCount, 0),
       expectedTotal: pageChain.find((page) => page.totalResults !== null)?.totalResults ?? null,
       reportedTotal: lastResponseObserved ? last?.totalResults ?? null : null,
       lastResponseHadNextPageToken: lastResponseObserved ? last?.hadNextPageToken ?? null : null, internalStop };
@@ -61,7 +62,7 @@ export async function observeProvider(requests: Requests, read: () => Promise<Pr
     const provider = new YouTubeLikedVideosProvider(requests, (page) => {
       lastResponseObserved = page !== null;
       if (page) pageChain[page.pageOrdinal - 1] = page;
-    });
+    }, (item) => invalidItems.push(item));
     const metrics = new Map<string, { omitted: boolean; richMissing: boolean; state: string }>();
     let completed = false;
     for await (const event of provider.enumerateLikedVideos(context, signal)) {

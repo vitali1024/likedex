@@ -50,7 +50,7 @@ function ObservationPage() {
   return <main className="options-app"><h1>DEVELOPMENT / RELEASE VALIDATION ONLY</h1>
     <p>This observes real YouTube bootstrap, membership pagination and metadata through the existing provider. It does not create a mirror, save a sync attempt, reconcile or prune. Production Sync remains closed.</p>
     <p><a href="options.html">Return to Options</a> and explicitly Connect before observing. Close other Likedex pages during observation. Keep this page open; closing it cancels the run. Worker interruption is failure, not success.</p>
-    <p>Only aggregate evidence is shown, temporarily for ten minutes after the last update. No identifiers, titles, response bodies, tokens or page tokens are exported. Counts describe API-visible membership, not a guarantee of uncapped lifetime completeness.</p>
+    <p>Only aggregate counts and sanitized structural failure facts are shown, temporarily for ten minutes after the last update. No identifiers, titles, timestamps, response bodies, tokens or page tokens are exported. Counts describe API-visible membership, not a guarantee of uncapped lifetime completeness.</p>
     <button disabled={running} onClick={begin}>Observe provider without syncing</button>
     {running && <button onClick={() => port.current?.disconnect()}>Cancel observation</button>}
     <p role="status">{running ? 'Observing; no trusted completion yet…' : result?.status === 'success'
@@ -59,7 +59,7 @@ function ObservationPage() {
     {error && <p role="alert">{error}</p>}
     {summary && <><h2>Sanitized evidence</h2><p>Counts are unique memberships except rawMemberships, duplicateVideoItems and page counts. hydrated means lookup returned an entry; withoutRichMetadata means title, channel name or duration is missing. Unknown or unavailable metadata still counts as membership. For duplicates, hydration counts describe the last observation per video.</p>
       <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(result ?? { status: 'in-progress', summary }, null, 2)}</pre></>}
-    <p>Record only this sanitized result plus build identity, time and naturally unobserved coverage. A trusted API-visible terminal chain does not by itself rule out a provider cap.</p>
+    <p>Record this complete sanitized result, including invalidItems page/item ordinals, allowlisted reasons and boolean field checks, plus build identity, time and naturally unobserved coverage. Null means a field is absent or cannot be compared safely. A trusted API-visible terminal chain does not by itself rule out a provider cap.</p>
   </main>;
 }
 const root = document.getElementById('root');

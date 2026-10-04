@@ -4,6 +4,8 @@ Baseline: clean `0ef0484766dbb3ed088040fe926d744c9cf58166` on 2026-10-04. This i
 
 ## What current evidence establishes
 
+Follow-up: a subsequent human observation narrowed this failure to `membership-item-invalid` on a continuing eighth page. This document preserves the earlier audit; the current [membership-item diagnosis and retry](membership-item-diagnosis.md) records the newer evidence and structural diagnostic patch. Its build hashes supersede this earlier unstaged build.
+
 The human supplied a **failed** observation with bootstrap validated, seven accepted/hydrated pages, 350 raw/unique memberships, reported total 3,547, and `untrusted-enumeration / enumeration-untrusted / scanning`. There were no accepted duplicates or hydration omissions. Actual observation time, Chrome version, loaded build hashes and the rejected response's page/token/count semantics were not supplied. This record preserves the report as human-provided evidence, not a new agent-run observation or successful validation.
 
 The exact live reason is **not proven**. Under the inspected real composition, the seventh accepted page must have supplied a continuation token: a terminal count of 350 against 3,547 would fail before hydration/yield. After the seventh yield, time/cancellation checks have different categories. The next membership response can fail before hydration and leave exactly the supplied summary. Thus `pages: 7` does not mean the provider issued only seven membership requests or that page seven was terminal. The failing eighth response's facts were discarded by the old aggregate-only observation.

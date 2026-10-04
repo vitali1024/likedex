@@ -74,12 +74,15 @@ test('separate validation package uses Options Connect, observes without writes,
     chrome.runtime.onConnect.addListener((port) => { globalThis.validationTestSender = { id: port.sender?.id, url: port.sender?.url, hasTab: port.sender?.tab !== undefined }; });
     const fixtures = ${JSON.stringify(fixtures)};
     globalThis.validationPrematureTerminal = false;
+    globalThis.validationInvalidItem = false;
     chrome.identity.getAuthToken = async () => ({ token: fixtures.token, grantedScopes: ['https://www.googleapis.com/auth/youtube.readonly'] });
     globalThis.fetch = async (input) => {
       const url = new URL(String(input));
       const body = url.pathname.endsWith('/channels') ? fixtures.channel
         : url.pathname.endsWith('/playlistItems') ? url.searchParams.has('pageToken')
-          ? globalThis.validationPrematureTerminal ? { ...fixtures.second, items: [], pageInfo: { totalResults: 2, resultsPerPage: 0 } } : fixtures.second
+          ? globalThis.validationInvalidItem ? { ...fixtures.second, items: fixtures.second.items.map((item) => ({ ...item,
+              contentDetails: undefined, snippet: { ...item.snippet, publishedAt: 'private-date-sentinel' } })) }
+            : globalThis.validationPrematureTerminal ? { ...fixtures.second, items: [], pageInfo: { totalResults: 2, resultsPerPage: 0 } } : fixtures.second
           : fixtures.first
         : url.pathname.endsWith('/videos') ? url.searchParams.get('id')?.includes('0000000002') ? fixtures.metadataSecond : fixtures.metadataFirst
         : undefined;
@@ -156,6 +159,21 @@ test('separate validation package uses Options Connect, observes without writes,
         reportedTotal: 2, lastResponseHadNextPageToken: false, internalStop: 'none',
         pageChain: [{ pageOrdinal: 1, itemCount: 1 }, { pageOrdinal: 2, itemCount: 0, hydrationRequestedCount: null }] } });
     for (const secret of [TOKEN_A, 'synthetic-next', 'source-1', 'owner-a', 'Video 1']) expect(JSON.stringify(failedEvidence)).not.toContain(secret);
+    expect(await raw()).toEqual(before);
+    await worker.evaluate(() => {
+      const state = globalThis as unknown as { validationPrematureTerminal: boolean; validationInvalidItem: boolean };
+      state.validationPrematureTerminal = false; state.validationInvalidItem = true;
+    });
+    await page.getByRole('button', { name: 'Observe provider without syncing' }).click();
+    await expect.poll(async () => JSON.parse((await page.locator('pre').textContent()) ?? '{}').enumerationDiagnostic?.reasonCode)
+      .toBe('membership-content-details-missing');
+    const itemEvidence = JSON.parse((await page.locator('pre').textContent())!);
+    expect(itemEvidence).toMatchObject({ status: 'failed', summary: { pages: 1, rawMemberships: 1, trustedCompletion: false },
+      enumerationDiagnostic: { internalStop: 'none', invalidItems: [{ pageOrdinal: 2, itemOrdinal: 1,
+        reasonCodes: ['membership-content-details-missing'], fieldPresence: { contentDetails: false, contentVideoId: false,
+          snippetVideoId: true, publishedAt: true }, resourceKindIsVideo: true, videoIdsAgree: null,
+        playlistIdMatchesExpected: true, likedAtParses: false }] } });
+    for (const secret of [TOKEN_A, 'synthetic-next', 'source-2', 'owner-a', 'Video 2', 'private-date-sentinel']) expect(JSON.stringify(itemEvidence)).not.toContain(secret);
     expect(await raw()).toEqual(before);
     await page.clock.install();
     await page.clock.fastForward(600_001);

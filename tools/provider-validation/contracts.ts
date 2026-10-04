@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { errorSchema } from '../../src/domain/contracts';
 import { authenticationDiagnosticSchema } from '../../src/auth/errors';
-import { membershipPageDiagnosticSchema, providerReasonSchema } from '../../src/provider/diagnostics';
+import { membershipItemDiagnosticSchema, membershipPageDiagnosticSchema, providerReasonSchema } from '../../src/provider/diagnostics';
 
 export const VALIDATION_PORT = 'likedex-release-provider-observation-v1';
 export const startSchema = z.strictObject({ operation: z.literal('OBSERVE_PROVIDER') });
@@ -16,6 +16,7 @@ export const summarySchema = z.strictObject({
 export type ValidationSummary = z.infer<typeof summarySchema>;
 export const enumerationDiagnosticSchema = z.strictObject({
   pageChain: z.array(membershipPageDiagnosticSchema),
+  invalidItems: z.array(membershipItemDiagnosticSchema).max(50),
   reasonCode: z.union([providerReasonSchema, authenticationDiagnosticSchema.shape.errorCode,
     z.enum(['trusted-complete', 'session-budget-exceeded', 'retry-budget-exceeded', 'session-clock-invalid'])]),
   observedMembershipCount: counter, expectedTotal: counter.nullable(), reportedTotal: counter.nullable(),

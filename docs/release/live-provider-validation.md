@@ -20,6 +20,8 @@ Use a real authorized YouTube account with the production Likedex extension/OAut
 
 A human-reported failed observation had validated bootstrap, seven accepted/hydrated pages, 350 raw/unique memberships against reported total 3,547, and `untrusted-enumeration / enumeration-untrusted`. Successful completion/approval is still pending. The exact live trust branch and original time/build context were not supplied. See [pagination diagnosis](provider-pagination-diagnosis.md) for the branch audit, safe diagnostic patch and one required human retry. Do not interpret the accepted-page summary as proof of a seven-page or 350-item provider cap.
 
+The subsequent human-provided observation reached a decoded eighth page with 50 items, stable total 3,547, fresh continuation, observed envelope count 400, no internal stop and `membership-item-invalid` before hydration. This proves the item-schema branch but not the exact field, item ordinal or a deleted/private cause. See the [membership-item diagnosis](membership-item-diagnosis.md) for unchanged-contract structural diagnostics and the latest single required retry. Live trusted completion and human approval remain PENDING.
+
 Fill only from actual execution; unchecked fields are not success claims. Never record OAuth tokens, credentials, raw sensitive response bodies, personal liked-video content or opaque page tokens. Use aggregate counts only where safe; identify the account only by a non-sensitive label if necessary.
 
 | Field | Actual evidence |

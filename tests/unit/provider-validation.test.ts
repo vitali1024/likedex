@@ -11,7 +11,7 @@ import { validationSenderAllowed } from '@/tools/provider-validation/background'
 import { resultSchema, startSchema, type ValidationSummary } from '@/tools/provider-validation/contracts';
 import { NOW, OBSERVED, attempt, owner, success, video } from '../fixtures/storage';
 import { TOKEN_A, channelResponse, chromeIdentity, held, json, timing } from '../fixtures/authentication';
-import { member, membershipPage, metadata, videoId, videosPage, generatedLikesPages } from '../fixtures/provider';
+import { member, membershipPage, metadata, videoId, videosPage, generatedLikesPages, invalidMembershipCases } from '../fixtures/provider';
 
 let db: LikedexDatabase;
 let repository: LibraryRepository;
@@ -54,6 +54,53 @@ function setup(bodies: unknown[] = [channelResponse(), membershipPage(), videosP
   return { chrome, fetcher, requests, clock, abort, progress, run };
 }
 describe('Human release observation is non-destructive', () => {
+  it.each(invalidMembershipCases())('reports safe per-item reason $reason without mutation', async ({ item, reason }) => {
+    const scan = setup([channelResponse(), membershipPage([item])]);
+    const result = await scan.run();
+    expect(result).toMatchObject({ status: 'failed', summary: { trustedCompletion: false, pages: 0 },
+      enumerationDiagnostic: { reasonCode: reason, invalidItems: [{ pageOrdinal: 1, itemOrdinal: 1, reasonCodes: [reason] }] } });
+    expect(scan.fetcher).toHaveBeenCalledTimes(2);
+    for (const secret of [TOKEN_A, 'owner-a', 'likes-owner-a', 'source-1', videoId(), videoId(2),
+      '2026-09-01', 'private.kind', 'private.id-sentinel', 'private-kind-sentinel', 'private.playlist-sentinel',
+      'private.video-sentinel', 'private-details-sentinel', 'private-status-sentinel', 'other-playlist', 'youtube#channel']) {
+      expect(JSON.stringify(result)).not.toContain(secret);
+    }
+    const badItem = result.enumerationDiagnostic.invalidItems[0]!;
+    expect(resultSchema.safeParse({ ...result, enumerationDiagnostic: { ...result.enumerationDiagnostic,
+      invalidItems: [{ ...badItem, videoId: TOKEN_A }] } }).success).toBe(false);
+    expect(resultSchema.safeParse({ ...result, enumerationDiagnostic: { ...result.enumerationDiagnostic,
+      invalidItems: [{ ...badItem, reasonCodes: [TOKEN_A] }] } }).success).toBe(false);
+  });
+  it('collects all invalid page-eight items and all schema reasons per item before failing closed', async () => {
+    const generated = generatedLikesPages();
+    const items = Array.from({ length: 50 }, (_, index): unknown => member(index + 351));
+    const base = member(367);
+    items[16] = { ...base, snippet: { ...base.snippet, publishedAt: 123, position: -1 }, status: { privacyStatus: 'secret-status-value' } };
+    items[34] = { ...member(385), contentDetails: undefined };
+    items[49] = { ...member(400), contentDetails: { videoId: videoId(1) } };
+    const result = await setup([channelResponse(), ...generated.slice(0, 7).flatMap((page) => [page.membership, page.hydration]),
+      membershipPage(items, 'private-next-token', 3547)]).run();
+    expect(result).toMatchObject({ status: 'failed', summary: { pages: 7, rawMemberships: 350, hydrationPages: 7, hydrated: 350, trustedCompletion: false },
+      enumerationDiagnostic: { reasonCode: 'membership-liked-at-type-invalid', observedMembershipCount: 400,
+        expectedTotal: 3547, reportedTotal: 3547, internalStop: 'none', invalidItems: [
+          { pageOrdinal: 8, itemOrdinal: 17, reasonCodes: ['membership-liked-at-type-invalid', 'membership-position-invalid', 'membership-privacy-status-invalid'],
+            fieldPresence: { contentVideoId: true, publishedAt: true, status: true }, likedAtParses: false, positionValid: false,
+            privacyStatusRecognized: false, videoIdsAgree: true, playlistIdMatchesExpected: true },
+          { pageOrdinal: 8, itemOrdinal: 35, reasonCodes: ['membership-content-details-missing'],
+            fieldPresence: { contentDetails: false, contentVideoId: false }, snippetVideoIdValid: true, videoIdsAgree: null },
+          { pageOrdinal: 8, itemOrdinal: 50, reasonCodes: ['membership-video-id-conflict'], videoIdsAgree: false },
+        ] } });
+    expect(result.enumerationDiagnostic.pageChain.at(-1)).toMatchObject({ pageOrdinal: 8, itemCount: 50,
+      tokenRelation: 'fresh', hydrationRequestedCount: null, hydrationReturnedCount: null });
+    for (const secret of ['secret-status-value', 'private-next-token', videoId(367), 'source-367', '2026-09-01']) expect(JSON.stringify(result)).not.toContain(secret);
+  });
+  it('reports date parsing as a structural fact without rejecting an unusable date string', async () => {
+    const item = { ...member(), status: undefined, snippet: { ...member().snippet, publishedAt: 'private-unusable-date' } };
+    const result = await setup([channelResponse(), membershipPage([item])]).run();
+    expect(result.enumerationDiagnostic.invalidItems[0]).toMatchObject({ reasonCodes: ['membership-status-missing'],
+      likedAtParses: false, fieldPresence: { publishedAt: true }, privacyStatusRecognized: null });
+    expect(JSON.stringify(result)).not.toContain('private-unusable-date');
+  });
   it('returns safe bootstrap failure diagnostics without acquiring mutation capabilities', async () => {
     const scan = setup([]);
     scan.fetcher.mockRejectedValue(new TypeError(`Illegal invocation ${TOKEN_A} secret body`));
