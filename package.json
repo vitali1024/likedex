@@ -24,7 +24,10 @@
     "build": "wxt build -b chrome --mv3",
     "check:build": "node scripts/check-build.mjs",
     "test:e2e": "playwright test",
-    "verify": "npm run lint && npm run typecheck && npm run test && npm run build && npm run check:build && npm run test:e2e"
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build && npm run check:build && npm run build:provider-validation && npm run check:provider-validation && npm run test:e2e",
+    "build:provider-validation": "wxt build -c wxt.validation.config.ts -b chrome --mv3",
+    "check:provider-validation": "node scripts/check-provider-validation-build.mjs",
+    "verify:provider-validation": "vitest run tests/unit/provider-validation.test.ts"
   },
   "dependencies": {
     "dexie": "4.4.6",

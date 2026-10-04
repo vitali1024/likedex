@@ -61,6 +61,7 @@ async function inspect(directory) {
       assert.doesNotMatch(inspected, /localhost|127\.0\.0\.1|@vite\/client|react-dom\/server|vitest|playwright|LikeDeck/);
       assert.doesNotMatch(text, /<script[^>]+src=["']https?:/i);
       assert.doesNotMatch(text, /client_secret|BEGIN (?:RSA )?PRIVATE KEY|ya29\./);
+      assert.doesNotMatch(text, /likedex-release-provider-observation-v1|observation-only|provider-validation\.html|RELEASE VALIDATION ONLY/);
     }
   }
 }

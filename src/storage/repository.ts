@@ -143,6 +143,16 @@ export class LibraryRepository {
     return this.operation(() => this.db.transaction('r', this.db.tables, () => this.control()));
   }
 
+  // Release observation preconditions only: no clock bookkeeping, recovery,
+  // freshness renewal or writes. The caller must not expose this as a UI DTO.
+  async readObservationSnapshot(now: string): Promise<LibrarySnapshot> {
+    return this.operation(() => this.db.transaction('r', this.db.tables, async () => {
+      const snapshot = await this.state();
+      this.assertEligible(snapshot, now);
+      return snapshot;
+    }));
+  }
+
   // Local freshness/cleanup validation only. The future coordinator MUST also
   // validate authorization before exposing this snapshot to UI or Export.
   async readSnapshot(now: string): Promise<LibrarySnapshot> {

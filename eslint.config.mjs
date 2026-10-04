@@ -28,6 +28,24 @@ export default defineConfig(
     },
   },
   {
+    files: ['tools/provider-validation/service.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/storage/**', '**/sync/**', '**/runtime/**', '**/auth/service', 'dexie', '**/tests/**', '**/fixtures/**'],
+        message: 'Observation must not acquire storage, sync, cleanup or finalization capabilities.',
+      }] }],
+    },
+  },
+  {
+    files: ['entrypoints/**/*.{ts,tsx}', 'src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: ['**/provider-validation/**', '**/tests/**', '**/fixtures/**', '**/mocks/**', '**/demo/**', '**/*.test.*', '**/*.spec.*', 'vitest', 'vitest/*', '@playwright/test'],
+        message: 'Production must not import release observation or test composition.',
+      }] }],
+    },
+  },
+  {
     files: ['src/provider/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
