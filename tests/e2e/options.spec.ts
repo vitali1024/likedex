@@ -27,7 +27,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await context?.close(); });
 test.afterEach(() => { expect(pageErrors).toEqual([]); });
 
-async function open(mode = 'library', agreement = true) {
+async function open(mode = 'library', agreement = true, surface = 'options') {
   const page = await context.newPage();
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.clock.install({ time: new Date(NOW) });
@@ -35,7 +35,7 @@ async function open(mode = 'library', agreement = true) {
     if (accepted) localStorage.setItem('likedex.privacy-agreement', 'phase7-v1');
     else localStorage.removeItem('likedex.privacy-agreement');
   }, agreement);
-  await page.goto(`${origin}/options.html?mode=${mode}`);
+  await page.goto(`${origin}/options.html?mode=${mode}&surface=${surface}`);
   return page;
 }
 async function change(page: Page, mode: string, count?: number) {
@@ -65,7 +65,8 @@ test('local search/filter/sort/page/selection and canonical links; production au
   const rows = page.locator('.video-row');
   await expect(rows).toHaveCount(50);
   const beforeLocalInteraction = await page.evaluate(() => [...(window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls]);
-  await page.screenshot({ path: resolve('.output/phase7-options-wide.png'), fullPage: false });
+  await page.clock.fastForward(3000);
+  await page.screenshot({ path: resolve('.output/phase7-options-wide.png'), fullPage: false, animations: 'disabled' });
   await page.getByRole('button', { name: 'Next page' }).click(); await expect(rows).toHaveCount(12);
   await page.getByLabel('Search library').fill('café travel'); await expect(rows).toHaveCount(1);
   await expect(page.getByText('Page 1 of 1')).toBeVisible();
@@ -114,7 +115,7 @@ test('keyboard shortcut, narrow focused detail/Back, page context and no horizon
   await page.locator('h1').click(); await page.keyboard.press('/'); await expect(page.getByLabel('Search library')).toBeFocused();
   await page.getByLabel('Search library').fill('video'); await page.keyboard.press('/'); await expect(page.getByLabel('Search library')).toHaveValue('video/');
   await page.getByLabel('Search library').fill('');
-  for (const width of [1200, 800, 600, 360]) {
+  for (const width of [1440, 1200, 1024, 800, 600, 480, 360]) {
     await page.setViewportSize({ width, height: 650 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
@@ -124,7 +125,7 @@ test('keyboard shortcut, narrow focused detail/Back, page context and no horizon
   const row = page.locator('.video-row').first(); await row.focus(); await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Back to library' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Video detail' })).toBeFocused();
-  await page.screenshot({ path: resolve('.output/phase7-options-narrow.png'), fullPage: false });
+  await page.screenshot({ path: resolve('.output/phase7-options-narrow.png'), fullPage: false, animations: 'disabled' });
   await page.getByRole('button', { name: 'Back to library' }).click(); await expect(page.getByText('Page 2 of 2')).toBeVisible(); await expect(row).toBeFocused();
   await change(page, 'library', 2); await expect(page.getByText('Page 1 of 1')).toBeVisible(); await expect(page.locator('.video-row')).toHaveCount(2);
   await expect(page.getByRole('link', { name: 'Open on YouTube' })).toHaveCount(0);
@@ -141,7 +142,7 @@ test('runtime failure, owner mismatch, active sync and later failure never masqu
   await expect(page.getByText('Local library owner:', { exact: false })).toContainText('owner-a');
   await expect(page.getByText('Connected channel:', { exact: false })).toContainText('owner-b');
   await expect(page.getByRole('button', { name: 'Sync', exact: true })).toBeDisabled();
-  await change(page, 'active'); await expect(page.getByText('Scanning liked videos', { exact: true })).toBeVisible();
+  await change(page, 'active'); await expect(page.getByRole('status').filter({ hasText: 'Scanning liked videos' })).toBeVisible();
   await expect(page.getByText('2 pages accepted · 60 unique memberships observed')).toBeVisible();
   const activeReads = await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((c) => c === 'LIBRARY_SNAPSHOT_GET').length);
   await page.clock.fastForward(2000);
@@ -155,7 +156,7 @@ test('expiry with a missed notification discards cached detail and rows before r
   const page = await open(); await expect(page.locator('.video-row')).toHaveCount(50); await page.locator('.video-row').first().click();
   await page.clock.setSystemTime(new Date('2026-10-16T00:00:00.000Z'));
   // A delayed deadline timer must not permit a stale Copy action either.
-  await page.getByRole('button', { name: 'Copy link' }).click();
+  await page.getByRole('button', { name: 'Copy link', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Library unavailable' })).toBeVisible();
   await expect(page.locator('.video-row')).toHaveCount(0); await expect(page.getByRole('link', { name: 'Open on YouTube' })).toHaveCount(0);
   await page.close();
@@ -169,5 +170,102 @@ test('agreement storage failure stays visible and never invokes Connect', async 
   await expect(page.getByText('Your privacy agreement could not be saved.', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Connect YouTube', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.includes('AUTH_CONNECT'))).toBe(false);
+  await page.close();
+});
+
+test('row actions, arrow selection and filter dismissal preserve local query context', async () => {
+  const page = await open();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const rows = page.locator('.video-row');
+  await expect(rows).toHaveCount(50);
+  await rows.first().focus(); await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused(); await expect(rows.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('complementary', { name: 'Video detail' }).getByRole('heading')).toHaveText('Video 002');
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => { (window as unknown as { copied: string }).copied = text; } } }));
+  const card = page.locator('.video-card').first();
+  await card.getByRole('button', { name: 'Copy link for A café in the mountains', exact: true }).click();
+  await expect(card.getByRole('status')).toHaveText('Link copied.');
+  expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe('https://www.youtube.com/watch?v=v0000000000');
+  await expect(card.getByRole('link')).toHaveAttribute('href', 'https://www.youtube.com/watch?v=v0000000000');
+  await page.getByLabel('Search library').fill('video');
+  await page.getByText('Filter library', { exact: true }).click();
+  await page.getByLabel('Channels', { exact: true }).selectOption(['channel-a', 'channel-b']);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.filters > summary')).toBeFocused();
+  await expect(page.getByLabel('Channels', { exact: true })).not.toBeVisible();
+  await expect(page.getByLabel('Active filters').getByRole('button')).toHaveCount(2);
+  await page.getByLabel('Active filters').getByRole('button', { name: 'Travel' }).click();
+  await expect(page.getByLabel('Active filters').getByRole('button')).toHaveCount(1);
+  await expect(page.getByLabel('Search library')).toHaveValue('video');
+  await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await expect(page.getByLabel('Search library')).toBeFocused();
+  await expect(page.getByLabel('Search library')).toHaveValue('');
+  await page.close();
+});
+
+test('privacy dialog traps focus, dismisses with Escape and restores the invoking control', async () => {
+  const page = await open();
+  const trigger = page.getByRole('button', { name: 'Privacy & terms' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Privacy & terms' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Close privacy notice' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  expect(await dialog.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible(); await expect(trigger).toBeFocused();
+  await trigger.click(); await dialog.getByRole('button', { name: 'Close privacy notice' }).click();
+  await expect(trigger).toBeFocused();
+  await page.close();
+});
+
+test('Side Panel expands one row and detail Back restores page, query, scroll and focus', async () => {
+  const page = await open('library', true, 'sidepanel');
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const rows = page.locator('.video-row');
+  await expect(rows).toHaveCount(50);
+  await rows.first().click(); await expect(rows.first()).toHaveAttribute('aria-expanded', 'true');
+  await rows.nth(1).click(); await expect(rows.first()).toHaveAttribute('aria-expanded', 'false');
+  await expect(rows.nth(1)).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('button', { name: 'View details' })).toHaveCount(1);
+  await page.getByLabel('Search library').fill('video');
+  await page.getByRole('button', { name: 'Next page' }).click();
+  await rows.nth(3).click();
+  const view = page.getByRole('button', { name: 'View details' });
+  await view.scrollIntoViewIfNeeded();
+  const scroll = await page.locator('.results-scroll').evaluate((node) => node.scrollTop);
+  await view.click();
+  const detail = page.getByRole('complementary', { name: 'Video detail' });
+  await expect(detail).toBeFocused(); await expect(detail.getByRole('heading')).toHaveText('Video 055');
+  await page.keyboard.press('Escape');
+  await expect(view).toBeFocused(); await expect(page.getByLabel('Search library')).toHaveValue('video');
+  await expect(page.getByText('Page 2 of 2')).toBeVisible();
+  expect(await page.locator('.results-scroll').evaluate((node) => node.scrollTop)).toBe(scroll);
+  await view.click(); await change(page, 'library', 2);
+  await expect(page.getByText('The selected video is no longer in these results.')).toBeVisible();
+  await expect(page.locator('.results')).toBeFocused();
+  await expect(page.getByText('Page 1 of 1')).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 480 });
+  await page.getByText('Filter library', { exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls)).not.toContain('SYNC_START');
+  await page.close();
+});
+
+test('3547-record library stays page bounded and local while selection and filters change', async () => {
+  const page = await open();
+  await change(page, 'library', 3547);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator('.video-row')).toHaveCount(50);
+  const calls = await page.evaluate(() => [...(window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls]);
+  await page.getByLabel('Search library').fill('video');
+  await page.getByLabel('Sort', { exact: true }).selectOption('duration-shortest');
+  await page.getByLabel('Duration', { exact: true }).selectOption('medium');
+  await expect(page.locator('.video-row')).toHaveCount(50);
+  await page.locator('.video-row').nth(4).click();
+  await expect(page.getByRole('complementary', { name: 'Video detail' }).getByRole('heading')).toBeVisible();
+  expect(await page.evaluate(() => [...(window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls])).toEqual(calls);
   await page.close();
 });

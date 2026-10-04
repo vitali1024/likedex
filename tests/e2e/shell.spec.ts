@@ -26,19 +26,19 @@ test('Production extension loads shells, typed runtime, approved gate and restar
     for (const [path, surface] of [['options.html', 'Options'], ['sidepanel.html', 'Side Panel']] as const) {
       await page.goto(`${origin}/${path}`);
       await expect(page.getByRole('heading', { level: 1, name: 'Likedex', exact: true })).toBeVisible();
-      if (surface === 'Options') {
-        await expect(page.getByRole('heading', { name: 'Find that video again.' })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Connect YouTube', exact: true })).toBeDisabled();
-      } else {
-        await expect(page.getByRole('heading', { level: 2, name: surface, exact: true })).toBeVisible();
-        await expect(page.getByText('Development foundation. Product features are not available yet.')).toBeVisible();
-      }
+      await expect(page.getByRole('heading', { name: 'Find that video again.' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Connect YouTube', exact: true })).toBeDisabled();
+      if (surface === 'Side Panel') await expect(page.locator('.compact-app')).toBeVisible();
     }
     expect(errors).toEqual([]);
     // This checks the real browser API configuration, not native toolbar clicking.
     await expect.poll(() => worker.evaluate(() =>
       (globalThis as unknown as { chrome: typeof browser }).chrome.sidePanel.getPanelBehavior(),
     )).toEqual({ openPanelOnActionClick: true });
+
+    // Both surfaces have live observers. Isolate deliberate worker stops and
+    // synthetic recovery data from concurrent UI authorization/status requests.
+    await page.goto(`${origin}/manifest.json`);
 
     const send = async (operation: RuntimeOperation) => {
       const request = requestSchema.parse({ protocolVersion: 1, requestId: crypto.randomUUID(), operation, payload: {} });

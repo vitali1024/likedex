@@ -1,4 +1,39 @@
-# Phase 7 Options library UI
+# Options and Side Panel library UI
+
+## Current presentation, 2026-10-04
+
+Options and Side Panel now share the production `RuntimeClient` / `LibraryObserver` composition, dark cyan presentation, explicit connection/sync controls, local query toolbar, bounded cards, direct watch/copy actions, and truthful status/error states. The material below this section is the historical Phase 7 record; its claims that Side Panel is a placeholder and that production Sync remains disabled are superseded by current code and the later release evidence.
+
+- Wide Options uses the library/detail split at 1280px; smaller Options widths use a focused detail route with Back. The Side Panel always uses compact list → one expanded row → focused detail. Back restores query, sort, page, selection/expansion, list/page scroll and invoking focus. Removed/ineligible selection returns to the results region with a notice.
+- Search, duration, seven sorts, stable-ID multi-channel selection and inclusive explicit date-basis ranges retain the existing query contract. Reset/Clear filters retains search. Active filter chips remove individual constraints. Page size remains 50; there is no virtualization or new state framework.
+- The privacy toolbar action opens the existing notice in a native modal dialog, with title/description, focus trap, Escape and focus restoration. No placeholder Settings actions, export, Clear, Disconnect, storage estimates or badges were added. Those unimplemented data controls remain outside this presentation work.
+- Row buttons retain semantic selection/expansion. Up/Down/Home/End navigate visible rows; wide Options also updates selection. `/` focuses search and returns from focused details when needed. Buttons and external links remain separate, labeled controls. Clipboard success requires completion, and delayed results cannot announce success after unmount/expiry.
+- All remote text stays escaped. Trusted thumbnail origin, lazy loading, failure placeholders, canonical watch URLs and action-time eligibility checks are retained. Full titles, unknown metadata, known descriptions and availability caveats remain visible in details.
+- The manifest description now describes the working local library. OAuth, public key, extension ID, permissions, provider configuration, auth/domain/storage/sync/runtime modules and pure query implementation are unchanged.
+
+### Motion and performance
+
+Normal motion includes 150ms surface/selection feedback; 0.96 pressed scale with a 250ms spring-like CSS easing; 10px/opacity row entrance over 440ms with 20ms initial and 40ms per-row stagger; 180ms disclosure entrance and 150ms exit; 200ms modal scale/fade with matching exit; 200ms compact expansion/collapse; and a 1s spinner only during real active/pending work. State changes interrupt CSS transitions naturally. Removed/ineligible data is discarded immediately, without retaining outgoing data for animation. `prefers-reduced-motion` disables nonessential animation, transitions and pressed transforms.
+
+The existing dependency set is unchanged. Inline SVGs provide the small icon set. Query results, page slices, selection lookup, available count and channel choices are memoized against their actual inputs. Row presentation is memoized, and the refresh callback is stable so unrelated auth/pending-control changes do not rerender an unchanged library. Local selection does not refilter/sort the entire snapshot. Only the bounded page creates cards and lazy images; compact expansion content stays bounded and becomes inert/hidden when collapsed. Subscriptions remain in the existing observer/hook, and disclosure listeners clean up on unmount.
+
+### Review and verification scope
+
+The separate test composition covers first run, no automatic Sync, explicit Sync, local search/filter/sort/page, canonical links/clipboard failures, expiry, truthful runtime errors, row keyboard/actions, filter dismissal, privacy-dialog focus, Side Panel context restoration/removal, and a 3,547-record fixture. The production extension smoke covers both real entrypoints and worker recovery. Its isolated recovery fixture runs from a passive extension resource so active UI authorization checks do not legitimately clean up synthetic unauthorized data.
+
+Visual review covers 1440, 1200, 1024, 800, 600, 480 and 360px, plus a 320×480 compact filter view; default/selected/detail, search, open/multiple filters, sort, pagination, empty, active sync, failed sync, privacy dialog and compact expansion/detail. No horizontal overflow was observed. Review captures under `.output/ui-review/` are ignored local artifacts: populated views use the separate deterministic composition; `production-*` captures use the actual production package in an isolated disconnected profile. They are not evidence of a new real-account sync. No account authorization or remote sync was initiated for visual review.
+
+Human review should reload the unpacked production package, inspect the existing real mirror and thumbnails, try selection/Copy/Open, filter and page, then check native Side Panel expansion/detail/Back and keyboard/reduced-motion behavior. Native toolbar clicking, screen-reader/200% zoom audit, exact release package smoke, independent release review and the pre-existing unimplemented data controls remain separate release work. This UI change is not a claim that all release criteria are complete.
+
+### Verification results, 2026-10-04
+
+Final `npm run verify` exited 0: lint, strict typecheck, 541 unit tests in 13 files, production build/artifact checks, separate provider-validation build/checks, and 13 Chromium E2E tests. The separately requested `npm run verify:sync` passed all 278 tests; `npm audit` returned 0 vulnerabilities; `git diff --check` passed. Four new E2E cases cover row actions/filter dismissal, native dialog focus, compact navigation/restoration, and the 3,547-record page bound. Existing production smoke now exercises both actual surfaces and isolates deliberate worker stops from live observer traffic. No safety assertion was weakened.
+
+Chromium initially returned sandbox `spawn EPERM`; the established permitted execution path ran the actual suites. Restricted npm registry/cache access initially failed; permitted audit succeeded. Remaining output warnings are Playwright NO_COLOR/FORCE_COLOR and Git LF/CRLF notices. No dependency was added or removed. No commit, staging or push was performed.
+
+Changed files: `src/options/OptionsApp.tsx`, `LibraryBrowser.tsx`, `options.css`, `use-options-runtime.ts`, new `Disclosure.tsx` and `Icon.tsx`; `entrypoints/sidepanel/main.tsx`; `tests/e2e/options.spec.ts`, `tests/e2e/shell.spec.ts`, `tests/options-harness/main.tsx`; `wxt.config.ts` (description only); this document.
+
+## Historical Phase 7 record
 
 Maker implementation on clean committed Phase 6 baseline `826f546`. Options uses real Phase 6 runtime messaging; this document does not record human UX approval, independent review, live OAuth/provider success, or release acceptance. Work is left unstaged/uncommitted for human review. Phase 8 has not begun.
 

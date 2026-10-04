@@ -1,9 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Foundation } from '@/src/Foundation';
-import '@/src/foundation.css';
+import { OptionsApp } from '@/src/options/OptionsApp';
+import { RuntimeClient } from '@/src/runtime/client';
+import '@/src/options/options.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Likedex Side Panel mount element is missing.');
 
-createRoot(root).render(<StrictMode><Foundation surface="Side Panel" /></StrictMode>);
+const client = new RuntimeClient();
+createRoot(root).render(<StrictMode><OptionsApp client={client} surface="sidepanel" /></StrictMode>);

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { SyncMetadata } from '../domain/contracts';
 import { isActiveAttempt } from '../domain/contracts';
 import { RuntimeClient } from '../runtime/client';
@@ -6,6 +6,8 @@ import type { RuntimeFailure, RuntimeResult } from '../runtime/contracts';
 import { LibraryBrowser } from './LibraryBrowser';
 import { ATTEMPT_LABELS, ERROR_MESSAGES, failureMessage, formatDate } from './presentation';
 import { useOptionsRuntime } from './use-options-runtime';
+import { Icon } from './Icon';
+import { Disclosure } from './Disclosure';
 
 const AGREEMENT_KEY = 'likedex.privacy-agreement';
 const AGREEMENT_VERSION = 'phase7-v1';
@@ -13,7 +15,7 @@ function hasAgreement(): boolean {
   try { return localStorage.getItem(AGREEMENT_KEY) === AGREEMENT_VERSION; } catch { return false; }
 }
 export function PrivacyNotice() {
-  return <details id="privacy-notice" className="privacy-notice"><summary>Likedex privacy notice for this build</summary>
+  return <details id="privacy-notice" className="privacy-notice" open><summary>Likedex privacy notice for this build</summary>
     <p>Likedex uses the YouTube API to read your channel identity, Liked Videos membership, and video metadata. Access is read-only: Likedex does not change your likes or playlists or download video media.</p>
     <p>Your mirror stays in this extension’s storage on this device. Ordinary search, filters, sorting, and details use that local snapshot. Google authorization and API requests, thumbnails, and links you open involve network communication. Likedex has no backend, analytics, or telemetry.</p>
     <p>API data must be refreshed or deleted by its 30-calendar-day deadline. Expired data is blocked and deleted on the next execution opportunity. If required authorization cannot be validated, associated local data is blocked and deletion is attempted.</p>
@@ -27,10 +29,20 @@ export function SyncStatus({ sync }: { sync: SyncMetadata | null }) {
   const success = sync?.latestSuccessfulSync;
   const partiallyUpdated = sync !== null && sync.lastMirrorChangeRevision !== sync.lastFinalizedMirrorRevision
     && (Boolean(success) || (attempt?.safeCommits ?? 0) > 0 || (sync.previousCompletedResult?.safeCommits ?? 0) > 0);
-  return <section className="sync-status" aria-label="Synchronization status">
-    <p role="status">{attempt ? ATTEMPT_LABELS[attempt.state] : success ? 'No active sync' : 'Never synced'}
-      {attempt?.retrying && ' · Retrying a temporary request'}</p>
-    {attempt && <p className="muted">{attempt.pagesAccepted} pages accepted · {attempt.uniqueMembership} unique memberships observed
+  const active = attempt ? isActiveAttempt(attempt.state) : false;
+  const tone = active ? 'active' : attempt && attempt.state !== 'success' ? 'warning' : success ? 'success' : 'idle';
+  return <section className="sync-status" aria-label="Synchronization status" data-tone={tone}>
+    <Disclosure className="sync-disclosure" label={<><Icon name={active ? 'sync' : tone === 'success' ? 'check' : 'info'} className={active ? 'spinning' : ''} />
+      <span role="status">{attempt ? ATTEMPT_LABELS[attempt.state] : success ? 'Last sync succeeded' : 'Never synced'}</span></>}>
+      <h3>Synchronization</h3>
+      <p>A full YouTube scan starts only when you choose Sync.</p>
+      <ol className="sync-steps">{(['preparing', 'scanning', 'applying', 'finalizing'] as const).map((state) => <li key={state} data-current={attempt?.state === state}>
+        <Icon name={attempt?.state === state ? 'sync' : 'chevron'} className={attempt?.state === state ? 'spinning' : ''} />{ATTEMPT_LABELS[state]}
+      </li>)}</ol>
+      {success && <p className="success-summary">Latest successful snapshot: {success.localMembershipCount} mirrored memberships.</p>}
+    </Disclosure>
+    {attempt?.retrying && <p role="status">Retrying a temporary request</p>}
+    {attempt && <p className="sync-counts muted">{attempt.pagesAccepted} pages accepted · {attempt.uniqueMembership} unique memberships observed
       {attempt.finishedAt && ` · ${formatDate(attempt.finishedAt)}`}</p>}
     {attempt?.error && <p className="error" role="alert">{ERROR_MESSAGES[attempt.error.category]}</p>}
     {partiallyUpdated && <p className="notice">The local mirror is partially updated; it has not been fully reconciled since these changes.</p>}
@@ -38,8 +50,9 @@ export function SyncStatus({ sync }: { sync: SyncMetadata | null }) {
   </section>;
 }
 
-export function OptionsApp({ client }: { client: RuntimeClient }) {
+export function OptionsApp({ client, surface = 'options' }: { client: RuntimeClient; surface?: 'options' | 'sidepanel' }) {
   const { library, auth, stamp, refresh } = useOptionsRuntime(client);
+  const refreshExpired = useCallback(() => { void refresh(); }, [refresh]);
   const [agreed, setAgreed] = useState(hasAgreement);
   const [connecting, setConnecting] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -47,6 +60,7 @@ export function OptionsApp({ client }: { client: RuntimeClient }) {
   const [localError, setLocalError] = useState('');
   const [acknowledged, setAcknowledged] = useState<RuntimeResult<'SYNC_START'> | null>(null);
   const mutation = useRef(false);
+  const privacyDialog = useRef<HTMLDialogElement>(null);
   const recordAgreement = (checked: boolean) => {
     try {
       if (checked) localStorage.setItem(AGREEMENT_KEY, AGREEMENT_VERSION);
@@ -89,12 +103,14 @@ export function OptionsApp({ client }: { client: RuntimeClient }) {
     } finally { mutation.current = false; setStarting(false); }
   };
   const needsConnect = disconnected || (auth.status === 'unavailable' && auth.error.detail?.category === 'authentication');
-  return <main className="options-app">
-    <header className="app-header"><div className="brand"><span className="brand-mark" aria-hidden="true">L</span><div><h1>Likedex</h1><p>Your likes, within reach.</p></div></div>
-      <div className="header-actions"><a href="#privacy-notice">Privacy &amp; terms</a>
-        <button className="primary" onClick={() => { void start(); }} disabled={!agreed || disconnected || !identity || mismatch || active || connecting || starting}>
-          {starting ? 'Requesting sync…' : active ? 'Sync in progress' : 'Sync'}</button></div></header>
-    <section className="connection" aria-label="YouTube connection">
+  return <main className={`options-app ${surface === 'sidepanel' ? 'compact-app' : ''}`}>
+    <header className="app-header"><div className="brand"><span className="brand-mark" aria-hidden="true"><Icon name="play" /></span><div><h1>Likedex</h1><p>Your likes, within reach.</p></div></div>
+      <div className="header-actions">
+        <button onClick={() => { void start(); }} disabled={!agreed || disconnected || !identity || mismatch || active || connecting || starting}>
+          <Icon name="sync" className={active || starting ? 'spinning' : ''} />{starting ? 'Requesting sync…' : active ? 'Sync in progress' : 'Sync'}</button>
+        <button className="icon-button" aria-label="Privacy & terms" title="Privacy & terms" onClick={() => privacyDialog.current?.showModal()}><Icon name="shield" /></button>
+      </div></header>
+    <section className={`connection ${identity?.status === 'authorized' ? 'connected' : ''}`} aria-label="YouTube connection">
       {auth.status === 'loading' && <p role="status">Loading connection status…</p>}
       {auth.status === 'unavailable' && <div role="alert"><h2>Connection status unavailable</h2><p>{failureMessage(auth.error)}</p></div>}
       {authValue?.status === 'validation-pending' && <p role="status">Checking YouTube authorization…</p>}
@@ -109,7 +125,7 @@ export function OptionsApp({ client }: { client: RuntimeClient }) {
         <p>Connect YouTube to mirror your Liked Videos on this device. Access is read-only. After sync, ordinary browsing, search, and filters run locally. You can later revoke authorization.</p>
         <p>Mirrored API data is refreshed or deleted within 30 calendar days. Authorization checks can require a network connection.</p></div>}
       {(!agreed || needsConnect) && <label className="agreement"><input type="checkbox" checked={agreed} onChange={(event) => recordAgreement(event.target.checked)} />
-        <span>I have read and agree to the <a href="#privacy-notice">Likedex privacy notice</a> and <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">YouTube Terms of Service</a>.</span></label>}
+        <span>I have read and agree to the <a href="#privacy-notice" onClick={(event) => { event.preventDefault(); privacyDialog.current?.showModal(); }}>Likedex privacy notice</a> and <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">YouTube Terms of Service</a>.</span></label>}
       {(needsConnect || mismatch || (auth.status === 'unavailable')) && <button className="primary" disabled={!agreed || connecting || starting || active} onClick={() => { void connect(); }}>
         {connecting ? 'Connecting YouTube…' : 'Connect YouTube'}</button>}
       {connecting && <p role="status">Waiting for your explicit YouTube authorization…</p>}
@@ -128,7 +144,11 @@ export function OptionsApp({ client }: { client: RuntimeClient }) {
           : library.status === 'loading' ? 'Loading sync status…' : 'Sync status unavailable. Local runtime truth could not be retrieved.'}</p>
         {acknowledged && <p>Runtime acknowledged {ATTEMPT_LABELS[acknowledged.attempt.state].toLowerCase()}; awaiting an eligible snapshot.</p>}</section>}
     {library.status === 'unavailable' && <button onClick={() => { void refresh(); }}>Retry local snapshot</button>}
-    {agreed && !disconnected && <LibraryBrowser key={stamp} observation={library} onExpired={() => { void refresh(); }} />}
-    <footer><p className="muted">Local-first browsing · YouTube access is read-only</p><PrivacyNotice /></footer>
+    {agreed && !disconnected && <LibraryBrowser key={stamp} observation={library} compact={surface === 'sidepanel'} onExpired={refreshExpired} />}
+    <dialog ref={privacyDialog} className="privacy-dialog" aria-labelledby="privacy-title" aria-describedby="privacy-description" onClick={(event) => {
+      if (event.target === event.currentTarget) privacyDialog.current?.close();
+    }}><div className="dialog-body"><div className="dialog-heading"><h2 id="privacy-title">Privacy &amp; terms</h2>
+      <button className="icon-button" aria-label="Close privacy notice" onClick={() => privacyDialog.current?.close()}><Icon name="close" /></button></div>
+      <p id="privacy-description" className="muted">Local-first browsing · YouTube access is read-only</p><PrivacyNotice /></div></dialog>
   </main>;
 }

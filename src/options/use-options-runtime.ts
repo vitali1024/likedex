@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RuntimeClient } from '../runtime/client';
 import type { ClientResult, RuntimeResult } from '../runtime/contracts';
 import { LibraryObserver, type LibraryObservation } from '../runtime/observer';
@@ -70,5 +70,6 @@ export function useOptionsRuntime(client: RuntimeClient) {
       refreshRef.current = async () => {};
     };
   }, [client]);
-  return { library, auth, stamp, refresh: () => refreshRef.current() };
+  const refresh = useCallback(() => refreshRef.current(), []);
+  return { library, auth, stamp, refresh };
 }

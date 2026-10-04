@@ -67,4 +67,4 @@ const client = new RuntimeClient({
 });
 const root = document.getElementById('root');
 if (!root) throw new Error('Test composition root missing');
-createRoot(root).render(<OptionsApp client={client} />);
+createRoot(root).render(<OptionsApp client={client} surface={new URL(location.href).searchParams.get('surface') === 'sidepanel' ? 'sidepanel' : 'options'} />);
