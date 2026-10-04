@@ -175,6 +175,37 @@ export class LibraryRepository {
     });
   }
 
+  // Successful periodic checks do not change auth epoch or refresh API facts.
+  async recordAuthorizationCheck(dueAt: string, expected: ControlFence, now: string): Promise<ControlState> {
+    parse(instantSchema, dueAt, 'invalid-input');
+    parse(instantSchema, now, 'invalid-input');
+    if (dueAt <= now || Date.parse(dueAt) - Date.parse(now) > 24 * 60 * 60 * 1000) throw new StorageError('invalid-input');
+    return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
+      const snapshot = await this.state();
+      this.assertEligible(snapshot, now);
+      assertControlFence(snapshot.control, expected);
+      if (snapshot.control.connectionGate !== 'connected') throw new StorageError('stale-write');
+      const next: ControlState = { ...snapshot.control, authorizationCheckDueAt: dueAt,
+        lastClockSeenAt: now, revision: increment(snapshot.control.revision) };
+      await this.db.control.put(next, SINGLETON_KEY);
+      return next;
+    }));
+  }
+
+  async recordAuthenticationTeardown(value: Pick<ControlState, 'revocationStatus' | 'cacheInvalidationStatus'>,
+    expected: ControlFence): Promise<ControlState> {
+    const outcomes = parse(z.strictObject({ revocationStatus: controlSchema.shape.revocationStatus,
+      cacheInvalidationStatus: controlSchema.shape.cacheInvalidationStatus }), value, 'invalid-input');
+    return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
+      const control = await this.control();
+      assertControlFence(control, expected);
+      if (control.connectionGate !== 'disconnected') throw new StorageError('stale-write');
+      const next: ControlState = { ...control, ...outcomes, revision: increment(control.revision) };
+      await this.db.control.put(next, SINGLETON_KEY);
+      return next;
+    }));
+  }
+
   private assertAttempt(attempt: SyncAttempt, snapshot: LibrarySnapshot): void {
     if (attempt.dataGeneration !== snapshot.control.dataGeneration || attempt.authEpoch !== snapshot.control.authEpoch) {
       throw new StorageError('stale-write');
@@ -262,7 +293,9 @@ export class LibraryRepository {
     return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
       const control = await this.control();
       assertControlFence(control, expected);
-      if (control.pendingCleanupReason !== null) throw new StorageError('cleanup-pending');
+      // Explicit Disconnect may supersede an already pending policy cleanup;
+      // it must still close authorization and record its own remote outcomes.
+      if (control.pendingCleanupReason !== null && validReason !== 'disconnect') throw new StorageError('cleanup-pending');
       const closeAuthorization = validReason !== 'expiry';
       const next: ControlState = {
         ...control, dataGeneration: increment(control.dataGeneration), revision: increment(control.revision),
@@ -271,7 +304,7 @@ export class LibraryRepository {
         authorizationCheckDueAt: closeAuthorization ? null : control.authorizationCheckDueAt,
         pendingCleanupReason: validReason, deletionStatus: 'pending',
         revocationStatus: validReason === 'disconnect' ? 'pending' : control.revocationStatus,
-        cacheInvalidationStatus: validReason === 'disconnect' ? 'pending' : control.cacheInvalidationStatus,
+        cacheInvalidationStatus: closeAuthorization ? 'pending' : control.cacheInvalidationStatus,
       };
       await this.db.control.put(next, SINGLETON_KEY);
       return next;

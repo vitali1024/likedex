@@ -1,15 +1,28 @@
 # Likedex public OAuth verification readiness
 
-Status: planned, 2026-10-04. No Cloud project/client, consent configuration, test users, credentials, or verification submission were created. Do not request credentials in chat or include secrets in repository artifacts. [B-01](privacy-and-data.md#b-01-resolved-human-decision) is resolved; revoke/delete, external-invalidity cleanup and bounded freshness must be verified before release.
+Status: Phase 3 service/configuration foundation, 2026-10-04. The human supplied the production public configuration below; no external resources, test users, credentials or verification submission were created by this implementation task. Deterministic fake-boundary tests and manifest checks do not establish live OAuth or console/public-access readiness. Do not request credentials in chat or include secrets in repository artifacts. [B-01](privacy-and-data.md#b-01-resolved-human-decision) is resolved; live revoke/delete, external-invalidity cleanup and bounded freshness remain release gates.
+
+## Human-supplied public production configuration
+
+| Field | Value |
+|---|---|
+| Google Cloud project ID | `likedex-extension-prod` |
+| Chrome Web Store item ID | `mmefiakgfhddiojfdnkfpfpbkgbfgkgj` |
+| Google OAuth client ID | `875739161327-ut8ca2iocubeq8a2a2eleu9kcdu6d1ue.apps.googleusercontent.com` |
+| Application type | Chrome Extension, created for the stable Store identity |
+| Scope | `https://www.googleapis.com/auth/youtube.readonly` |
+
+The manifest now contains this client and scope, with the original public Store key. `check:build` checks exact values and derived ID; Playwright checks the loaded ID. API enablement, contacts/branding/domains, test-audience settings and public verification status still need human console evidence. Public identifiers are not secrets. [Authentication foundation](../authentication-foundation.md) records implementation, deterministic acceptance coverage and cleanup/recovery limits.
 
 ## Deadline-controlled: early production identity
 
-The Chrome extension identity prerequisite is resolved: the human owner reserved the Likedex Store draft as `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`, and its public key is configured in the WXT manifest. The future Google OAuth client of type **Chrome Extension must target exactly `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`**. The existing real-extension smoke checks the loaded production extension ID. This resolves only the identity prerequisite; Google Cloud setup, OAuth client creation/configuration and authentication implementation remain unfinished.
+The Chrome extension identity prerequisite is resolved: the human owner reserved the Likedex Store draft as `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`, and its public key is configured in the WXT manifest. The supplied **Chrome Extension** client targets this identity. Existing real-extension smoke checks the loaded production extension ID. Service implementation and deterministic configuration checks are present; live OAuth, final console readiness and public verification remain unverified.
 
 - [x] Reserve the Store draft and pin stable local-build identity, the identity portion of Phase 11A's [sequence](chrome-web-store.md), before final auth integration.
-- [ ] Human creates or designates the Likedex Google Cloud project, enables YouTube Data API, and confirms ownership/contact/quota access. Record actual nonsecret project identifiers when available.
+- [x] Human designates Google Cloud project `likedex-extension-prod` and supplies its public identifier.
+- [ ] Human confirms YouTube Data API enablement, ownership/contact/quota access with console evidence.
 - [ ] Configure branding as **Likedex** with real support/developer contacts, homepage, privacy policy and required domain ownership; disclose bounded retention and the approved revoke/delete controls.
-- [ ] Create production OAuth client of type **Chrome Extension**, bound to `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`. Configure manifest OAuth client ID and required scope in the future authentication phase; preserve the unpacked/Store ID match. Follow [Chrome OAuth setup](https://developer.chrome.com/docs/extensions/how-to/integrate/oauth).
+- [x] Human reports the production **Chrome Extension** OAuth client created for `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`; Phase 3 configures its exact client ID and read-only scope, preserving the public key/ID. Follow [Chrome OAuth setup](https://developer.chrome.com/docs/extensions/how-to/integrate/oauth). This records supplied configuration, not live-account verification.
 - [ ] Never substitute a temporary extension ID and call final production wiring complete. No server client secret, refresh-token store, or service account is required by this product design.
 
 ## Scope and consent
@@ -35,6 +48,8 @@ Justification: read the authenticated YouTube channel identity, discover its lik
 Google's [verification guidance](https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification) covers scope justification, branding/domain preparation, demonstration and review. The current console is the execution checklist; this draft claims no completed verification.
 
 ## Production account smoke and revoke verification
+
+**Phase 3 live OAuth smoke: DEFERRED TO EARLIEST SAFE EXPLICIT INVOCATION PATH**, normally Phase 7 after Phase 6 service/runtime integration. Shell placeholders remain unchanged. No temporary production UI or token-exposing developer invocation was added, and no real-account authorization/revocation success is claimed. Perform the deferred connection check as soon as that path exists; complete the broader exact-package checklist before release.
 
 Human runs with the production-like exact package and stable ID:
 
