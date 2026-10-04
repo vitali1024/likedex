@@ -19,6 +19,7 @@
     "verify:auth": "vitest run tests/unit/authentication.test.ts tests/unit/authentication-service.test.ts",
     "verify:provider": "vitest run tests/unit/provider-ingestion.test.ts",
     "verify:sync": "vitest run tests/unit/domain.test.ts tests/unit/storage.test.ts tests/unit/provider-ingestion.test.ts tests/unit/synchronization.test.ts tests/unit/synchronization-service.test.ts",
+    "verify:runtime": "vitest run tests/unit/runtime.test.ts tests/unit/runtime-observer.test.ts",
     "build": "wxt build -b chrome --mv3",
     "check:build": "node scripts/check-build.mjs",
     "test:e2e": "playwright test",

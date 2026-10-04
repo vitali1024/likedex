@@ -38,7 +38,8 @@ export class SynchronizationService {
   private readonly auth: AuthenticationService;
   constructor(private readonly repository: LibraryRepository, private readonly requests: GoogleAuthorizationRequests,
     private readonly workerInstanceId: string, private readonly now: () => string = () => new Date().toISOString(),
-    private readonly nextId: () => string = () => crypto.randomUUID()) {
+    private readonly nextId: () => string = () => crypto.randomUUID(),
+    private readonly authorizationValidated: (receipt: VerifiedSyncOwner) => void = () => {}) {
     z.uuid().parse(workerInstanceId);
     this.provider = new YouTubeLikedVideosProvider(requests);
     this.auth = new AuthenticationService(repository, requests, now);
@@ -96,6 +97,7 @@ export class SynchronizationService {
       snapshot = await this.repository.bindSyncOwner(firstOwner, snapshot.fence, this.now());
       await this.repository.recordAuthorizationCheck(new Date(Date.parse(this.now()) + 86_400_000).toISOString(),
         snapshot.control, this.now());
+      this.authorizationValidated(firstOwner);
       snapshot = await this.current(initial);
       snapshot = await this.repository.transitionSyncAttempt('scanning', snapshot.fence, this.now());
       phase = 'scanning';

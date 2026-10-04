@@ -2,7 +2,7 @@ import type { ControlState, CleanupReason } from '../domain/contracts';
 import { StorageError, type LibraryRepository, type ControlFence } from '../storage/repository';
 import { compareOwner, type AuthenticatedYouTubeBootstrap, type OwnerComparison } from '../domain/authentication';
 import { AuthenticationError, assertNotAborted, sanitizedFailure } from './errors';
-import type { GoogleAuthorizationRequests, RevocationOutcome } from './google-requests';
+import { isVerifiedSyncOwner, type VerifiedSyncOwner, type GoogleAuthorizationRequests, type RevocationOutcome } from './google-requests';
 
 type AuthRepository = Pick<LibraryRepository, 'readControl' | 'readSnapshot' | 'enforceRetention'
   | 'saveConnectionState' | 'recordAuthorizationCheck' | 'beginCleanup' | 'finishCleanup' | 'recordAuthenticationTeardown'>;
@@ -89,6 +89,14 @@ export class AuthenticationService {
   connectInteractively(): Promise<BootstrapResult> { return this.check(true); }
   // Required new-session/periodic check. Its caller owns lifecycle invocation.
   validateAuthorization(): Promise<BootstrapResult> { return this.check(false); }
+
+  // Reuse the actual sync session check in this worker without another network
+  // check racing page transactions. Durable scope/deadline is checked on use.
+  acceptSyncAuthorization(receipt: VerifiedSyncOwner): void {
+    if (!isVerifiedSyncOwner(receipt)) throw new AuthenticationError('unexpected');
+    this.validated = { ...receipt.scope, result: { status: 'authorized', bootstrap: receipt.owner,
+      ownerComparison: 'SAME_REMOTE_OWNER' } };
+  }
 
   // Sync's shared request session already exhausted the approved recovery
   // budget. Apply existing teardown policy without another authorization call.

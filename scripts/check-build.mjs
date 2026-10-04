@@ -52,7 +52,13 @@ async function inspect(directory) {
     if (entry.isDirectory()) await inspect(path);
     else if (/\.(js|html|json)$/.test(path)) {
       const text = await readFile(path, 'utf8');
-      assert.doesNotMatch(text, /localhost|127\.0\.0\.1|@vite\/client|react-dom\/server|vitest|playwright|LikeDeck/);
+      // Bundling the real repository brings Dexie's pinned location-only debug
+      // detector. It is not a development connection destination. Exempt only
+      // that exact expression; all other local-host references still fail.
+      const dexieDebugDetector = String.raw`/^(http|https):\/\/(localhost|127\.0\.0\.1)/.test(location.href)`;
+      assert.ok(text.split(dexieDebugDetector).length <= 2, 'Unexpected repeated Dexie debug detector');
+      const inspected = path === join(output, 'background.js') ? text.replace(dexieDebugDetector, '') : text;
+      assert.doesNotMatch(inspected, /localhost|127\.0\.0\.1|@vite\/client|react-dom\/server|vitest|playwright|LikeDeck/);
       assert.doesNotMatch(text, /<script[^>]+src=["']https?:/i);
       assert.doesNotMatch(text, /client_secret|BEGIN (?:RSA )?PRIVATE KEY|ya29\./);
     }
@@ -60,4 +66,4 @@ async function inspect(directory) {
 }
 
 await inspect(output);
-console.log('Phase 3 OAuth/Store identity, manifest, entrypoints, icons, and production artifact checks passed.');
+console.log('OAuth/Store identity, manifest, entrypoints, icons, and production artifact checks passed.');

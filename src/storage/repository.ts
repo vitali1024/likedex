@@ -51,10 +51,23 @@ function assertControlFence(control: ControlState, expected: ControlFence): void
 }
 
 export class LibraryRepository {
-  constructor(private readonly db: LikedexDatabase) {}
+  private notifiedRevision = -1;
+  constructor(private readonly db: LikedexDatabase,
+    private readonly onRevision: (control: ControlState) => void = () => {}) {}
 
   private async operation<T>(run: () => Promise<T>): Promise<T> {
-    try { return await run(); }
+    try {
+      const result = await run();
+      // Read after the transaction commits. Notification is a best-effort hint;
+      // a dropped hint cannot change the successful durable operation's result.
+      try {
+        const control = await this.db.control.get(SINGLETON_KEY);
+        if (control && control.revision > this.notifiedRevision) {
+          this.notifiedRevision = control.revision; this.onRevision(control);
+        }
+      } catch { /* Authoritative reads remain independently fallible. */ }
+      return result;
+    }
     catch (error) {
       if (error instanceof StorageError) throw error;
       throw new StorageError('persistence');
