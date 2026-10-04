@@ -16,7 +16,7 @@ The manifest now contains this client and scope, with the original public Store 
 
 ## Deadline-controlled: early production identity
 
-The Chrome extension identity prerequisite is resolved: the human owner reserved the Likedex Store draft as `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`, and its public key is configured in the WXT manifest. The supplied **Chrome Extension** client targets this identity. Existing real-extension smoke checks the loaded production extension ID. Service implementation and deterministic configuration checks are present; live OAuth, final console readiness and public verification remain unverified.
+The Chrome extension identity prerequisite is resolved: the human owner reserved the Likedex Store draft as `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`, and its public key is configured in the WXT manifest. The supplied **Chrome Extension** client targets this identity. Existing real-extension smoke checks the loaded production extension ID. Service implementation and deterministic configuration checks are present. The subsequent [successful live observation](live-provider-validation.md) validates authorized bootstrap/provider reads with the production extension/OAuth identity; final console readiness and public verification remain unverified.
 
 - [x] Reserve the Store draft and pin stable local-build identity, the identity portion of Phase 11A's [sequence](chrome-web-store.md), before final auth integration.
 - [x] Human designates Google Cloud project `likedex-extension-prod` and supplies its public identifier.
@@ -49,7 +49,7 @@ Google's [verification guidance](https://developers.google.com/identity/protocol
 
 ## Production account smoke and revoke verification
 
-**Phase 3 live OAuth smoke: DEFERRED TO EARLIEST SAFE EXPLICIT INVOCATION PATH**, normally Phase 7 after Phase 6 service/runtime integration. Shell placeholders remain unchanged. No temporary production UI or token-exposing developer invocation was added, and no real-account authorization/revocation success is claimed. Perform the deferred connection check as soon as that path exists; complete the broader exact-package checklist before release.
+**Live provider validation: COMPLETE / APPROVED. Production Sync gate: STILL CLOSED. First real synchronization smoke: NOT YET PERFORMED.** The human reported successful authorized bootstrap (`bootstrapValidated: true`) and full provider observation through the real production extension/OAuth identity in the dedicated validation build. See the [sanitized evidence and human acceptance](live-provider-validation.md). Fresh-consent versus cached-grant behavior and the broader Connect/revoke/delete/expiry checks below were not supplied as completed evidence. Approval authorizes a separate gate-enablement change; it does not itself enable Sync, establish public access readiness or satisfy the final exact-package smoke. No Phase 8 work is included.
 
 Human runs with the production-like exact package and stable ID:
 

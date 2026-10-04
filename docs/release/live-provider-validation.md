@@ -1,58 +1,93 @@
-# Likedex live-provider validation checklist
+# Likedex live-provider validation record
 
-**Status: PENDING — successful complete validation and human approval remain outstanding.** Human-reported failed observations below establish compatibility defects; they do not establish successful validation or production enablement. The [production provider validation gate](../synchronization.md#production-live-provider-validation-gate) must remain closed until successful factual evidence and explicit human approval are recorded. Automated fixture results cannot satisfy this prerequisite.
+**Live provider validation: COMPLETE / APPROVED. Production Sync gate: STILL CLOSED. First real synchronization smoke: NOT YET PERFORMED.** The human accepted the successful non-destructive live observation as satisfying the committed provider-validation prerequisite. This evidence record does not enable production Sync or begin Phase 8.
 
-## Human-controlled observation procedure
+## Completed observation record
 
-Use a real authorized YouTube account with the production Likedex extension/OAuth identity through a safe, explicitly authorized observation path. Phase 6 does not gain a production runtime bypass or fixture switch for this purpose. The observation path must consume the Phase 4 provider without invoking Phase 5 storage application, trusted finalization or local pruning. Any local pruning during observation requires separate authorization. No such observation path is implemented by this documentation amendment.
+Evidence and human decision recorded on **2026-10-04**, from the human's authoritative sanitized report in the documentation task “Likedex — Record Successful Live Provider Validation.” The observation used the real production extension/OAuth identity through the dedicated non-destructive release-validation build. This is a human-run live result, not an agent-run request or synthetic fixture result.
 
-- [ ] Record actual date/time with timezone, extension version and source commit. Verify the loaded extension ID and public OAuth configuration against [OAuth readiness](oauth-verification.md). Expected human-supplied configuration is Store item `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`, project `likedex-extension-prod`, and scope `https://www.googleapis.com/auth/youtube.readonly`; these expectations are not live verification evidence.
-- [ ] With explicit user authorization, verify `channels.list(mine=true, part=id,snippet,contentDetails)` succeeds and yields the expected authoritative channel bootstrap and Likes playlist ID. Missing or ambiguous identity fails validation.
-- [ ] Use that returned Likes playlist ID in the Phase 4 provider's `playlistItems.list` enumeration; do not guess a playlist or substitute fixture membership.
-- [ ] Observe real membership and follow validated continuation tokens from the first page to a valid terminal response. If the actual library naturally spans multiple pages, observe the multi-page path. Do not manufacture account changes to force it. Record any unobserved paths as limitations.
-- [ ] Observe `videos.list` hydration for returned video IDs and confirm mapping behaves as designed. Where rich metadata is naturally absent/unavailable, verify trustworthy membership IDs remain authoritative and metadata is represented honestly. A genuinely empty library has no hydration request; record that coverage limit.
-- [ ] Verify a genuine in-process `TrustedProviderCompletion` is produced after consuming the validated terminal stream, with matching bootstrap/playlist context and page/raw/unique counts. A copied or serialized summary is evidence only and cannot substitute for the capability.
-- [ ] Check for malformed/unmappable membership, missing required containers, count/token anomalies, unexpected thumbnail origins or observed completeness/cap behavior that undermines the completion proof. Record actual anomalies and limitations; stop affected work and follow the specification-amendment process if an assumption is contradicted. Do not relax provenance, owner receipts, finalizer or pruning gates.
-- [ ] Confirm observation did not invoke local reconciliation/finalization/pruning, unless separately authorized and recorded. Rare provider states remain covered by deterministic tests; do not manipulate the user's YouTube account to manufacture them.
-- [ ] Preserve sanitized evidence and obtain an explicit human decision to approve enablement or keep production disabled. Unresolved anomalies or missing approval keep the gate closed.
-
-## Pending evidence record
-
-The latest human-provided failed observation reached 70 accepted 50-item pages and a decoded 47-item terminal page with unchanged resultsPerPage 50, no continuation, stable total 3,547 and cumulative observed count 3,547. No invalid membership or internal stop occurred. Page 71 was rejected before hydration solely by `pagination-page-count-mismatch`. The [terminal compatibility correction and current retry](provider-pagination-diagnosis.md#current-proven-terminal-failure--2026-10-04) replace strict terminal resultsPerPage equality with validated chain and cumulative-count proof. Continuing-page integrity remains unchanged. Synthetic exact-shape success is maker evidence only; **successful complete live validation and production approval remain PENDING** until the human reruns and reports the corrected observation. No observation time, Chrome version or original build hashes are inferred.
-
-A human-reported failed observation had validated bootstrap, seven accepted/hydrated pages, 350 raw/unique memberships against reported total 3,547, and `untrusted-enumeration / enumeration-untrusted`. Successful completion/approval is still pending. The exact live trust branch and original time/build context were not supplied. See [pagination diagnosis](provider-pagination-diagnosis.md) for the branch audit, safe diagnostic patch and one required human retry. Do not interpret the accepted-page summary as proof of a seven-page or 350-item provider cap.
-
-The subsequent human-provided observation reached a decoded eighth page with 50 items, stable total 3,547, fresh continuation, observed envelope count 400, no internal stop and `membership-item-invalid` before hydration. At that stage it proved the item-schema branch but not the exact field, item ordinal or a deleted/private cause. Structural instrumentation enabled the later evidence below. Live trusted completion and human approval remain PENDING.
-
-The earlier privacy-specific human report identifies `membership-privacy-status-invalid` as the only failed field: valid item kind/source ID, expected playlist association, video resource, valid agreeing snippet/contentDetails video IDs, valid liked timestamp/position, and present status/privacy leaf, with `privacyStatusRecognized: false`. It establishes an unfamiliar string with trustworthy membership identity; no raw value is needed or recorded. The human-authorized provider contract correction tolerates only unknown strings as unknown metadata, preserving hydration evidence precedence and all identity/completion gates. Synthetic page-eight and 3,547-item / 71-page regressions pass; **the corrected complete live observation remains PENDING**. Follow the [current terminal correction retry](provider-pagination-diagnosis.md#current-maker-verification-and-required-human-retry). Observation time, Chrome version and original build context remain unsupplied.
-
-Fill only from actual execution; unchecked fields are not success claims. Never record OAuth tokens, credentials, raw sensitive response bodies, personal liked-video content or opaque page tokens. Use aggregate counts only where safe; identify the account only by a non-sensitive label if necessary.
-
-| Field | Actual evidence |
+| Observation field | Reported result |
 |---|---|
-| Observation date/time and timezone | PENDING |
-| Extension version/source commit and install mode | PENDING |
-| Loaded Chrome Store item ID | PENDING |
-| Google Cloud project ID/public OAuth client configuration | PENDING |
-| OAuth scope observed | PENDING |
-| Non-sensitive account label, if needed | PENDING |
-| Bootstrap/returned Likes playlist used (sanitized confirmation) | PENDING |
-| Request categories observed: channels, playlistItems, videos | PENDING |
-| Accepted pages/raw membership/unique membership counts, where safe | PENDING |
-| Single-/multi-page path and hydration coverage limits | PENDING |
-| Genuine terminal trusted-completion result | PENDING |
-| Anomalies, completeness/cap observations and other limitations | PENDING |
-| No local pruning confirmation or separate pruning authorization | PENDING |
-| Sanitized evidence references | PENDING |
-| Explicit human approval or decision to keep disabled, with date/reference | PENDING |
+| status | `success` |
+| mode | `observation-only` |
+| productionSyncGate | `closed` |
+| bootstrapValidated | `true` |
+| trustedCompletion | `true` |
+| pages | 71 |
+| rawMemberships | 3,547 |
+| uniqueMemberships | 3,547 |
+| duplicateVideoItems | 0 |
+| estimatedTotal | 3,547 |
+| hydrationPages | 71 |
+| hydrated | 3,404 |
+| lookupOmitted | 143 |
+| withoutRichMetadata | 144 |
+| unavailable | 0 |
+| unknownAvailability | 144 |
 
-## Release enablement sequence
+`hydrated` counts returned lookup entries, not proof of complete metadata or universal playability. Lookup omissions preserve membership and unknown availability; they do not establish deletion or unliking. The metadata and availability counts are separate classifications and must not be substituted for one another.
 
-1. Perform the live observation above through the human-controlled path.
-2. Preserve actual sanitized evidence in this record or linked artifacts.
-3. Obtain explicit human approval based on that evidence; otherwise keep disabled.
-4. Deliberately enable production synchronization/pruning in a reviewable change. Missing/malformed configuration must still fail closed; no fixture or caller-controlled bypass is allowed.
-5. Rerun full authoritative verification and applicable production/build checks for the enabled composition.
-6. Perform the real-account smoke test using the production identity and enabled build; record factual results.
+### Terminal page and diagnosis
 
-Complete this milestone before Chrome Web Store release, no later than Phase 11B. Independent review/remediation and the final exact-package smoke remain required in their assigned phases. The typed `provider-validation-required` result is a pre-release safety state, not the intended normal public experience after successful validation and approved enablement.
+| Terminal page field | Reported result |
+|---|---|
+| pageOrdinal | 71 |
+| itemCount | 47 |
+| totalResults | 3,547 |
+| resultsPerPage | 50 |
+| hadNextPageToken | `false` |
+| tokenRelation | `none` |
+| hydrationRequestedCount | 47 |
+| hydrationReturnedCount | 47 |
+
+| Terminal diagnosis field | Reported result |
+|---|---|
+| invalidItems | `[]` (zero invalid terminal items) |
+| reasonCode | `trusted-complete` |
+| observedMembershipCount | 3,547 |
+| expectedTotal | 3,547 |
+| reportedTotal | 3,547 |
+| lastResponseHadNextPageToken | `false` |
+| internalStop | `none` |
+
+The final 47-item page had no continuation and hydration completed 47/47. Observed, expected and reported terminal counts all agree at 3,547. The report confirms validated bootstrap and genuine trusted completion after 71 pages.
+
+No mirror was created. No sync attempt was persisted. No reconciliation, finalization or pruning occurred. Production Sync remained closed. The serialized report is release evidence; it is not a transferable `TrustedProviderCompletion` capability and cannot authorize a finalizer.
+
+### Evidence context and coverage limits
+
+The documentation baseline was clean at `3dd9744` (`fix: accept coherent terminal Likes page`). This identifies the repository at recording time; it is not an inferred observation build identity. Exact observation date/time/timezone, Chrome version, loaded extension version/install mode, source commit and package hashes were not supplied with this successful report. They are not invented or copied from earlier builds. The production extension/OAuth identity is human-confirmed here; separately measured public configuration values and consent-versus-cached-grant behavior were not supplied.
+
+The live result covers a nonempty multi-page library, hydration omissions, missing rich metadata, unknown availability and a short terminal page retaining resultsPerPage 50. No unavailable items or duplicate-video memberships were reported. Empty-library, duplicate, explicit unavailable/private/deleted, interruption and other rare failure paths are not claimed as live coverage. This observation establishes complete validated API-visible enumeration for this run; it does not independently prove an uncapped lifetime Likes library or a transactional remote snapshot. Independent review and later release/package checks remain required.
+
+Only sanitized aggregate evidence is recorded. No video, playlist or channel identifiers, titles, OAuth tokens, credentials, raw API bodies or page tokens are included.
+
+## Compatibility discoveries and corrections
+
+Live validation required corrections; the successful result does not erase the earlier failures:
+
+1. **Native fetch receiver:** unbound native `fetch`, invoked as a request-service member, caused Chromium `Illegal invocation` before the bootstrap HTTP request. The corrected default binds fetch to `globalThis`. See [OAuth/bootstrap diagnosis](oauth-bootstrap-diagnosis.md); committed correction `0ef0484`.
+2. **Playlist-item privacy metadata:** an unfamiliar string `privacyStatus` on an otherwise trustworthy page-eight membership was incorrectly treated as a membership-integrity failure. The correction treats unfamiliar playlist-item strings as unknown metadata, preserving required containers, types, identity checks and hydration precedence. See [membership-item diagnosis](membership-item-diagnosis.md); committed correction `27a992d`.
+3. **Short terminal pagination:** page 71 contained 47 items with resultsPerPage 50, no continuation and coherent total 3,547. Unconditional equality rejected it before hydration. The correction accepts the short terminal shape only with validated token-chain, membership and cumulative-count proof; continuing-page integrity remains enforced. See [pagination diagnosis](provider-pagination-diagnosis.md); committed correction `3dd9744`.
+
+Earlier seven-page/350-item progress, page-eight item rejection and the 70-page/pre-hydration terminal rejection were failed observations, not successful completion or evidence of a provider cap. Their diagnoses and maker verification remain historical evidence. The successful live report above supersedes their pending-retry status, not their factual findings. This is useful Specification-Driven Development and verification evidence, not an independent review or a fabricated loop history.
+
+## Human approval — 2026-10-04
+
+The human decision supplied in this task is:
+
+> The successful live observation is accepted as satisfying the committed provider-validation prerequisite for production synchronization enablement.
+
+**This approval authorizes a SEPARATE gate-enablement change. It does NOT itself enable Sync.** No production gate constant, provider/sync/runtime implementation or Phase 8 work is changed by this documentation task.
+
+## Release enablement sequence and remaining work
+
+1. **COMPLETE:** human-run non-destructive live observation and sanitized evidence recorded above.
+2. **APPROVED:** explicit human acceptance of the provider-validation prerequisite recorded above.
+3. **NOT PERFORMED:** deliberate production synchronization/pruning gate enablement in a separate reviewable change. Production Sync is still closed; missing/malformed configuration must still fail closed, with no fixture or caller-controlled bypass.
+4. **NOT PERFORMED FOR ENABLED COMPOSITION:** full authoritative verification and applicable production/build checks after gate enablement.
+5. **NOT YET PERFORMED:** first real synchronization smoke using the production identity and enabled build, with factual persistence/finalization results recorded separately.
+
+The first real sync smoke and final exact-package smoke are separate release obligations. Independent review/remediation and final package/submission requirements remain in their assigned phases. The typed `provider-validation-required` result remains the current production safety state until the separate enablement change occurs. No implementation, staging or commit is part of this evidence task.
+
+The [observation runbook](provider-observation-runbook.md) remains the procedure for any later explicitly authorized provider observation; repeating observation is not required merely to replace the historical pending status.

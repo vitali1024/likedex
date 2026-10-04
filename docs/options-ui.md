@@ -2,6 +2,8 @@
 
 Maker implementation on clean committed Phase 6 baseline `826f546`. Options uses real Phase 6 runtime messaging; this document does not record human UX approval, independent review, live OAuth/provider success, or release acceptance. Work is left unstaged/uncommitted for human review. Phase 8 has not begun.
 
+Subsequent release evidence, **2026-10-04**: [live provider validation COMPLETE / APPROVED](release/live-provider-validation.md); **production Sync gate STILL CLOSED; first real synchronization smoke NOT YET PERFORMED**. The human accepted the successful non-destructive observation as satisfying the provider-validation prerequisite and authorized a separate gate-enablement change. The Phase 7 maker record below, including its pending/untouched live-checklist statements, is historical; approval does not itself enable Sync or begin Phase 8.
+
 ## Files changed
 
 | Files | Purpose |

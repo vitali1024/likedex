@@ -25,6 +25,8 @@ Status: planned, not executed; B-01 resolved by human decision. IDs are stable a
 
 Running-sync criteria use an approved production provider validation gate or an explicitly enabled gate in separate deterministic test composition. Before live approval, production must instead satisfy AC-SYNC-013; this permits Phase 6 runtime/MV3 implementation without claiming production enablement. Provider provenance, owner-check receipts and trusted-finalizer invariants apply unchanged when enabled. Independent retention/authorization cleanup and data controls remain required while the gate is closed.
 
+Release evidence status, **2026-10-04**: **live provider validation COMPLETE / APPROVED; production Sync gate STILL CLOSED; first real synchronization smoke NOT YET PERFORMED**. The [successful observation and human acceptance](release/live-provider-validation.md) satisfy the committed provider-validation prerequisite and authorize a separate gate-enablement change. Approval does not itself enable Sync or prove running-sync/persistence/finalization acceptance. The current closed-gate behavior remains required until deliberate enablement; no Phase 8 work is included.
+
 | ID | Observable acceptance condition | Layer |
 |---|---|---|
 | AC-SYNC-001 | Empty local DB plus a valid nonempty remote sequence produces a persisted owned mirror and committed success with correct counts. | U, S |

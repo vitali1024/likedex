@@ -1,5 +1,7 @@
 # Terminal Likes pagination compatibility correction
 
+**Current release status — 2026-10-04:** [live provider validation is COMPLETE / APPROVED](live-provider-validation.md). The human's corrected observation succeeded over 71 pages / 3,547 unique memberships; the final 47-item page retained resultsPerPage 50, had no continuation and hydrated 47/47, with trusted-complete, matching observed/expected/reported counts, zero invalid terminal items and internalStop none. **Production Sync gate: STILL CLOSED. First real synchronization smoke: NOT YET PERFORMED.** Approval authorizes a separate gate-enablement change. The failure analysis, maker checks and retry/build context below are historical; their pending statements are superseded by the completed record. No Phase 8 work is included.
+
 ## Current proven terminal failure — 2026-10-04
 
 Clean source baseline: `27a992d` (`fix: tolerate unknown playlist item privacy status`). The human authorized this focused compatibility correction. No Phase 8 work, production Sync enablement, reconciliation/pruning, staging or commit is included. This is maker-local verification, not independent release review or a new agent-run live observation.
