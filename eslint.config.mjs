@@ -27,4 +27,14 @@ export default defineConfig(
       }],
     },
   },
+  {
+    files: ['src/provider/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { group: ['**/storage/**', 'dexie', '**/tests/**', '**/fixtures/**', '**/mocks/**', '**/demo/**', '**/*.test.*', '**/*.spec.*', 'vitest', 'vitest/*', '@playwright/test'], message: 'Providers return validated data and must not import storage or test composition.' },
+        ],
+      }],
+    },
+  },
 );

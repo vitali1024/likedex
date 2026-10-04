@@ -17,6 +17,7 @@
     "test": "vitest run",
     "verify:storage": "vitest run tests/unit/domain.test.ts tests/unit/storage.test.ts",
     "verify:auth": "vitest run tests/unit/authentication.test.ts tests/unit/authentication-service.test.ts",
+    "verify:provider": "vitest run tests/unit/provider-ingestion.test.ts",
     "build": "wxt build -b chrome --mv3",
     "check:build": "node scripts/check-build.mjs",
     "test:e2e": "playwright test",

@@ -4,7 +4,7 @@ Likedex is a planned Chrome extension for browsing, searching, and revisiting a 
 
 Its core principles are local-first browsing, read-only YouTube access, explicit library ownership, safe synchronization, and truthful status. Planned surfaces are a full-size Options page and a compact Side Panel, with Export Data, Clear Local Data, and Disconnect YouTube controls.
 
-**Status:** Phase 3 authentication and remote identity foundation, following the committed boundary clarification `754fc50` and original specification `aa46ad8`. [Authentication contracts](docs/authentication-foundation.md) describe OAuth configuration, silent/explicit auth, validated channel/Likes bootstrap, owner comparison and disconnect/cleanup services; [storage contracts](docs/storage-foundation.md) describe the underlying repository. Options and Side Panel still display foundation placeholders; the background only configures toolbar opening of the panel. Service invocation/runtime scheduling, playlist ingestion/synchronization, product UI and release submissions remain future work. Live OAuth smoke is **DEFERRED TO EARLIEST SAFE EXPLICIT INVOCATION PATH**; no real-account success is claimed.
+**Status:** Phase 4 provider ingestion builds on the committed Phase 3 authentication foundation `9f80777`. [Provider contracts](docs/provider-ingestion.md) describe validated Likes pagination, batched metadata hydration, streamed domain records and explicit provider completion evidence. [Authentication contracts](docs/authentication-foundation.md) and [storage contracts](docs/storage-foundation.md) describe the existing foundations. Options and Side Panel still display foundation placeholders; the background only configures toolbar opening of the panel. Service invocation/runtime scheduling, synchronization/reconciliation, product UI and release submissions remain future work. Live OAuth/provider smoke is **DEFERRED TO EARLIEST SAFE EXPLICIT INVOCATION PATH**; no real-account success or completed live-provider assumption gate is claimed.
 
 ## Foundation development and verification
 
@@ -23,9 +23,10 @@ On Linux CI, install browser system dependencies with `npx playwright install --
 | `npm run dev` | WXT Chrome MV3 development build |
 | `npm run lint` | TypeScript/React/hooks lint; production test-import restrictions; warnings fail |
 | `npm run typecheck` | Regenerate WXT declarations and independently check strict production/test TypeScript |
-| `npm run test` | Non-watch deterministic shell, domain, auth/bootstrap and Dexie repository tests |
+| `npm run test` | Non-watch deterministic shell, domain, auth/bootstrap, provider ingestion and Dexie repository tests |
 | `npm run verify:storage` | Focused domain/storage contracts, transactions, cleanup and freshness tests |
 | `npm run verify:auth` | Focused auth/request/bootstrap/ownership and service cleanup/recovery tests with injected fakes |
+| `npm run verify:provider` | Focused validated membership/hydration, streaming completion, token/count anomalies and bounded request tests |
 | `npm run build` | Production MV3 extension at `.output/chrome-mv3` |
 | `npm run check:build` | Inspect production OAuth/client/scope, permissions/CSP, key/derived Store ID, entries, icons and unwanted test/development/secret artifacts |
 | `npm run test:e2e` | Load the existing production build in isolated Playwright Chromium; check worker, both page mounts and panel behavior configuration |
@@ -39,7 +40,7 @@ Production composition lives in `entrypoints/` and `src/`. Tests live exclusivel
 
 The original foundation icons are a white L on a dark square, checked in at 16, 32, 48 and 128 pixels. Regenerate them with `node scripts/generate-icons.mjs`. Final Store assets and exact-package smoke testing belong to later release work.
 
-The human owner completed the Chrome Web Store **draft** reservation with version **0.1.0**; [release documentation](docs/release/chrome-web-store.md#reserved-chrome-web-store-identity) records the reserved identity. The next upload to this listing must use a version greater than 0.1.0; Phase 3 keeps the current version. The human supplied the public production project/client configuration now recorded in [OAuth readiness](docs/release/oauth-verification.md). Deterministic manifest checks establish configuration agreement, not live OAuth success or public verification. After human review/commit of Phase 3, the next phase is **Phase 4 — Provider Validation + YouTube Ingestion**, using **GPT-6.1 Sol, High**. Independent auth/storage review remains required before release.
+The human owner completed the Chrome Web Store **draft** reservation with version **0.1.0**; [release documentation](docs/release/chrome-web-store.md#reserved-chrome-web-store-identity) records the reserved identity. The next upload to this listing must use a version greater than 0.1.0; Phase 4 keeps the current version. The human supplied the public production project/client configuration now recorded in [OAuth readiness](docs/release/oauth-verification.md). Deterministic manifest checks establish configuration agreement, not live OAuth success or public verification. After human review/commit of Phase 4, the next implementation phase is **Phase 5 — Sync State Machine + Safe Reconciliation**, using **GPT-6.1 Sol, High**; live provider assumptions must be checked before enabling affected pruning. Independent auth/storage/provider review remains required before release.
 
 ## Documentation
 
@@ -50,6 +51,7 @@ The human owner completed the Chrome Web Store **draft** reservation with versio
 - [Implementation plan and model routing](docs/implementation-plan.md)
 - [Verification strategy](docs/verification-strategy.md)
 - [Authentication foundation](docs/authentication-foundation.md)
+- [Provider ingestion](docs/provider-ingestion.md)
 - [Chrome Web Store release](docs/release/chrome-web-store.md)
 - [OAuth verification readiness](docs/release/oauth-verification.md)
 - [Privacy and data inventory](docs/release/privacy-and-data.md)

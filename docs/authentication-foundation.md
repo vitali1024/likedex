@@ -10,6 +10,8 @@ The existing Store public key is unchanged. Manifest permissions are exactly `id
 
 Construct `ChromeIdentityAdapter`, `GoogleAuthorizationRequests`, and `AuthenticationService` explicitly in the future background composition. Phase 3 supplies the implementation modules without wiring them to shell entrypoints. Importing or constructing them performs no consent, provider request, or database initialization. Phase 6 owns invocation, runtime validation/routing, lifecycle scheduling, shared surface gates and cancellation of future sync work. UI callers must never import the token boundary.
 
+Phase 4 extends this same request boundary with fixed GET-only `playlistItems`/`videos` ingestion sessions, shared transient/auth recovery and replacement-owner revalidation. The earlier bootstrap/revoke APIs remain available. [Provider ingestion](provider-ingestion.md) records these additional paths and budgets; none is wired to runtime/UI yet.
+
 ## Authorization and bootstrap
 
 `ChromeIdentityAdapter` uses Chrome's Promise API: `getAuthToken`, `removeCachedAuthToken` for exact stale-token eviction, and `clearAllCachedAuthTokens` for teardown. Chrome owns the token cache. Token strings exist only at this internal adapter/request boundary, in authorization headers or the ephemeral revoke form body. They are excluded from service results, database records, diagnostics, logs and exports. No token value is saved on a service/class field. Granted scopes, when returned by Chrome, must include the read-only scope. Recognized Chrome rejection messages are classified locally and discarded; unknown exceptions remain unexpected failures.

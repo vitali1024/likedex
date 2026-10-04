@@ -9,6 +9,8 @@ const errors = {
   quota: ['quota', 'quota-exhausted'],
   'rate-limit': ['rate-limit', 'rate-limited'],
   'malformed-bootstrap': ['malformed-provider', 'provider-invalid'],
+  'malformed-provider': ['malformed-provider', 'provider-invalid'],
+  'request-budget': ['provider', 'provider-failed'],
   'identity-missing': ['identity', 'identity-unavailable'],
   'likes-playlist-missing': ['identity', 'identity-unavailable'],
   'owner-mismatch': ['owner-mismatch', 'owner-mismatch'],
