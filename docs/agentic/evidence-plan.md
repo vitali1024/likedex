@@ -16,7 +16,15 @@ Human B-01 resolution encoded in this uncommitted specification → human review
 
 The sync loop stops when `npm run verify:sync` passes or after three unsuccessful correction iterations. An escalation is honest evidence of the bound working. A single successful iteration is sufficient; never create artificial failures to increase the count. Follow [verification strategy](../verification-strategy.md) for the meaningful red-test control case and independent checker requirements.
 
-Only the evidence plan exists now. Do not create `docs/agentic/loops/` or `docs/agentic/reviews/` until real activity produces records. Record command, actual result, relevant commit, acceptance IDs and decisions with truthful timestamps when that work occurs. Sanitize tokens, account details and personal liked-library content before any public link.
+The practice artifacts above remain subject to actual execution; the specification correction below records work performed during Phase 3 preparation. Do not create `docs/agentic/loops/` or `docs/agentic/reviews/` until real activity produces records. Record command, actual result, relevant commit, acceptance IDs and decisions with truthful timestamps when that work occurs. Sanitize tokens, account details and personal liked-library content before any public link.
+
+## Authorized Phase 3 specification correction — 2026-10-04
+
+Implementation preparation at baseline `67453f3` revealed that Phase 3 required runtime contract integration and connection UI, conflicting with the separately defined Phase 6 runtime boundary and later UI phases. Preparation stopped before implementation. The human product owner confirmed the service-level Phase 3 boundary and authorized this focused documentation amendment, while explicitly prohibiting implementation, staging and committing in this amendment task.
+
+The [implementation plan](../implementation-plan.md#phase-3--authentication-and-remote-identity) now assigns OAuth configuration, auth/bootstrap/owner-comparison services, disconnect/revoke and cleanup foundations, injected-fake tests and documentation to Phase 3. It defers runtime contracts/handlers/routing to Phase 6 and connection/onboarding UI to Phases 7–8. The existing `channels.list` channel/Likes-playlist discovery requirement is confirmed; playlist enumeration remains deferred. Live OAuth smoke may wait for the earliest safe explicit user-triggered runtime/UI path; this amendment claims no live OAuth result.
+
+This is an actual Specification-Driven Development correction, not implementation or independent review evidence. The amendment is an unstaged working-tree change at this handoff; link its actual human commit after it exists, without claiming it is already in Git history. Frozen product behavior is unchanged.
 
 ## Final submission and demo
 

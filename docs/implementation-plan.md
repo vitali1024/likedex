@@ -50,13 +50,15 @@ Each phase ends at a reviewable commit boundary, subject to commit authorization
 
 ### Phase 3 — Authentication and remote identity
 
-- **Objective/scope:** explicit Connect, token recovery, read-only scope, authoritative identity, mismatch lockout, session/periodic authorization validation and external-invalidity cleanup using Phase 2 storage contracts.
-- **Expected artifacts:** future auth/identity modules, runtime contract integration, connection UI, fixture tests, nonsecret production configuration documentation.
-- **Gate:** AC-AUTH-001–005/008/009, AC-DATA-016 and AC-IDENTITY-001–005; production extension ID/client agree; lost/unverifiable authorization cannot expose retained data. Never request credentials in chat.
-- **Command:** `npm run verify:auth`, then `npm run verify`; manual real-account connection check records actual identity result.
+- **Objective/scope:** OAuth manifest configuration; Chrome Identity adapter/service with silent authorization, explicit interactive Connect, ephemeral token lifecycle and bounded stale-token recovery; authenticated channel bootstrap discovery and runtime validation; remote-owner comparison and mismatch lockout; disconnect/revoke service foundation and authorized-data cleanup coordination using Phase 2 storage contracts. Include service-level session/periodic authorization validation and external-invalidity cleanup; Phase 6 owns lifecycle invocation and scheduling.
+- **Expected artifacts:** OAuth/manifest configuration, authentication adapter/service, validated channel bootstrap and Likes playlist identifier, owner-comparison service/domain result, disconnect/revoke service foundation, deterministic tests with injected Chrome Identity/fetch boundaries, focused auth/identity documentation and nonsecret production configuration verification.
+- **Boundary:** runtime message contracts, handlers and routing are deferred to Phase 6. Product connection/onboarding UI is deferred to Phases 7–8; complete Disconnect controls remain Phase 9. No Liked Videos enumeration, `playlistItems.list` pagination, `videos.list` library hydration, synchronization, reconciliation or pruning belongs to Phase 3.
+- **Bootstrap:** `channels.list(mine=true, part=id,snippet,contentDetails)` validates the authoritative channel ID, optional title and `contentDetails.relatedPlaylists.likes`. Missing/malformed or ambiguous identity produces a typed failure; never guess identifiers. Discovering the Likes playlist ID does not enumerate that playlist.
+- **Gate:** implemented adapter/service/domain/storage portions of AC-AUTH-001–009, AC-DATA-010/015/016 and AC-IDENTITY-001–005, with explicit coverage limits; production extension ID/client/read-only scope agree; lost/unverifiable authorization closes access and coordinates cleanup. Full runtime, UI, owner-replacement and manual criteria remain gates of their later phases, not Phase 3 completion claims. Never request credentials in chat.
+- **Command:** `npm run verify:auth`, then `npm run verify`; Phase 3 auth tests use injected fakes and require no live account. The full real-account OAuth connection smoke may be deferred to the earliest phase providing a safe explicit user-triggered runtime/UI path, normally Phase 7. No temporary production UI is required. A minimal development-only invocation may be proposed later but is optional; record deferred smoke honestly and never claim live success without execution.
 - **Maker/effort:** GPT-6.1 Sol, High.
 - **Review:** human performs/authorizes external setup; independent auth review before release includes external revocation and bounded validation recovery.
-- **Deadline:** must complete. **Dependencies:** 2 and **11A completed before production integration**. Fixture development may precede external setup but cannot be called production-auth complete.
+- **Deadline:** must complete. **Dependencies:** 2 and **11A completed before production integration**. Fixture development may precede external setup; Phase 3 adapter/service and configuration verification does not establish live production OAuth behavior. Deferred account smoke remains required before release.
 
 ### Phase 4 — Provider validation and YouTube ingestion
 
@@ -80,9 +82,9 @@ Each phase ends at a reviewable commit boundary, subject to commit authorization
 
 ### Phase 6 — MV3 persistence and runtime messaging
 
-- **Objective/scope:** durable prompt start, worker recovery, typed RPC, fencing and authoritative observation; enforce earliest dataset/auth deadlines before use, on startup/resume and through active-context timers. Expiry deletes the whole authorized dataset conservatively without starting an automatic sync.
-- **Expected artifacts:** future coordinator/runtime modules, lifecycle/message integration tests, revision subscriber.
-- **Gate:** AC-SYNC-003/004/007/008/011/012, AC-STORAGE-004 and AC-DATA-013–016; kill/reinitialize worker without losing truth or exposing expired data. Prove idle/wake/timer behavior; add `chrome.alarms` only if a demonstrated gap requires it and justify permission/disclosure changes. Start cannot await enumeration.
+- **Objective/scope:** durable prompt start, worker recovery, typed RPC contracts, message handlers/routing, fencing and authoritative observation; integrate Phase 3 auth services through Connect, connection-status and Disconnect messages. Enforce earliest dataset/auth deadlines before use, on startup/resume and through active-context timers, invoking session/periodic authorization validation and cleanup services. Expiry deletes the whole authorized dataset conservatively without starting an automatic sync.
+- **Expected artifacts:** future coordinator/runtime modules, auth/runtime and lifecycle/message integration tests, revision subscriber. Product connection/onboarding UI remains in Phases 7–8.
+- **Gate:** runtime portions of AC-AUTH-001–009 and AC-IDENTITY-001–005, AC-SYNC-003/004/007/008/011/012, AC-STORAGE-004 and AC-DATA-013–016; kill/reinitialize worker without losing truth or exposing expired data. Prove idle/wake/timer behavior; add `chrome.alarms` only if a demonstrated gap requires it and justify permission/disclosure changes. Start cannot await enumeration.
 - **Command:** `npm run verify:runtime`, then `npm run verify`.
 - **Maker/effort:** GPT-6.1 Sol, High.
 - **Review:** lifecycle/concurrency included in independent checker; human approval for durable-state contract changes.
@@ -90,19 +92,19 @@ Each phase ends at a reviewable commit boundary, subject to commit authorization
 
 ### Phase 7 — Options library UI
 
-- **Objective/scope:** local query engine, available-only list, focused filters/sorts, page size 50, responsive split/details, links, truthful states; eligibility gates and expiry/cleanup UI invalidate cached data before reuse.
+- **Objective/scope:** Options connection/onboarding UI with the specified read-only/local-storage/control explanation, privacy agreement and explicit Connect through Phase 6 runtime; validated identity and owner-mismatch presentation. Local query engine, available-only list, focused filters/sorts, page size 50, responsive split/details, links, truthful states; eligibility gates and expiry/cleanup UI invalidate cached data before reuse.
 - **Expected artifacts:** future shared query/view-model code, Options components/styles, local behavior tests.
-- **Gate:** AC-LIBRARY-001–010 and AC-OPTIONS-001/002; storage/runtime failures distinct from empty states; no provider calls for local interaction.
-- **Command:** `npm run verify:ui`, then `npm run verify`.
+- **Gate:** connection/onboarding UI portions of AC-AUTH-001–003, AC-IDENTITY-003/004 and AC-PRIVACY-005, plus AC-LIBRARY-001–010 and AC-OPTIONS-001/002; storage/runtime failures distinct from empty states; no provider calls for local interaction.
+- **Command:** `npm run verify:ui`, then `npm run verify`; perform and record any deferred real-account OAuth connection smoke once the safe explicit Connect path exists, including AC-AUTH-002/005 manual coverage.
 - **Maker/effort:** GPT-6.1 Sol, Medium.
 - **Review:** human UX review of concrete working slice; sync/storage changes remain independently reviewable.
 - **Deadline:** must complete. **Dependencies:** 6. Safe stop: complete Options browsing with real local data.
 
 ### Phase 8 — Side Panel compact interactions
 
-- **Objective/scope:** compact list, single expanded row, focused detail route/Back, preserved query/page/selection/scroll and keyboard focus.
+- **Objective/scope:** Side Panel connection/onboarding UI using the shared explanation/consent and Phase 6 runtime contracts; compact list, single expanded row, focused detail route/Back, preserved query/page/selection/scroll and keyboard focus.
 - **Expected artifacts:** future Side Panel components/navigation state, adaptive controls, interaction tests.
-- **Gate:** AC-SIDEPANEL-001–005 with native toolbar check; no desktop split-pane squeezed into panel.
+- **Gate:** shared connection/onboarding behavior from Phase 7 and AC-SIDEPANEL-001–005 with native toolbar check; no desktop split-pane squeezed into panel.
 - **Command:** `npm run verify:ui`, `npm run test:e2e`, then `npm run verify`.
 - **Maker/effort:** GPT-6.1 Sol, Medium.
 - **Review:** human narrow-panel UX check; independent checker sees shared status behavior.
@@ -111,7 +113,7 @@ Each phase ends at a reviewable commit boundary, subject to commit authorization
 ### Phase 9 — Export, Clear Local Data, Disconnect
 
 - **Objective/scope:** explicit versioned eligible-data export, confirmed Clear without revocation, confirmed Disconnect with immediate Authorized Data deletion/revoke, independent failure outcomes and cross-surface cleanup. Reconnect starts fresh.
-- **Expected artifacts:** future data-control/auth modules, confirmations, deletion/revocation/expiry race tests and inventory updates reflecting the approved B-01 resolution.
+- **Expected artifacts:** future data-control modules integrating the Phase 3 disconnect/revoke service foundation through Phase 6 runtime, confirmations, deletion/revocation/expiry race tests and inventory updates reflecting the approved B-01 resolution.
 - **Gate:** AC-DATA-001–017, AC-AUTH-006–009, AC-SYNC-012, AC-PRIVACY-004; Clear/Disconnect remain distinct, no residual data is usable during cleanup and external exports remain user-controlled.
 - **Command:** `npm run verify:data`, `npm run verify:auth`, then `npm run verify`.
 - **Maker/effort:** GPT-6.1 Sol, High.

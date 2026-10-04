@@ -53,6 +53,8 @@ Request only `https://www.googleapis.com/auth/youtube.readonly`. Use `chrome.ide
 
 Resolve `channels.list(mine=true, part=id,snippet,contentDetails)` and validate the authenticated channel ID plus its `contentDetails.relatedPlaylists.likes`. Do not synthesize the likes playlist ID. Zero channels, more than one unresolved channel, missing likes playlist, or malformed identity must block sync with actionable error. Do not silently choose the first channel. These fields are documented in [channels.list](https://developers.google.com/youtube/v3/docs/channels/list) and the [channel resource](https://developers.google.com/youtube/v3/docs/channels).
 
+Phase 3 owns this validated authenticated bootstrap discovery, including the optional channel title and authoritative Likes playlist identifier, at adapter/service/domain level. Missing or malformed channel/playlist identity returns a typed validation failure. This does not enumerate Liked Videos: `playlistItems.list`, playlist pagination and `videos.list` library hydration remain Phase 4 ingestion work, with synchronization/reconciliation in Phase 5. Runtime messages/handlers/routing remain Phase 6; product connection/onboarding UI remains Phases 7–8, and complete Disconnect controls remain Phase 9. These phase boundaries do not change the final product behavior below.
+
 At every full attempt, revalidate owner before membership access. At finalization, recheck current auth epoch/generation and revalidate the remote owner before opening the transaction. A missing local owner is bound atomically only after authoritative identity validation. A mismatched owner yields zero page writes and zero pruning. Changing Google profile display data alone is not an ownership transition.
 
 ```mermaid
