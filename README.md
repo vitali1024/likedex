@@ -4,7 +4,7 @@ Likedex is a planned Chrome extension for browsing, searching, and revisiting a 
 
 Its core principles are local-first browsing, read-only YouTube access, explicit library ownership, safe synchronization, and truthful status. Planned surfaces are a full-size Options page and a compact Side Panel, with Export Data, Clear Local Data, and Disconnect YouTube controls.
 
-**Status:** Phase 1 tooling and minimal extension shell, based on specification commit `aa46ad8`. Options and Side Panel display foundation placeholders. The background only configures toolbar opening of the panel. Product features, production OAuth, persistence, synchronization, and release submissions remain future work.
+**Status:** Phase 2 domain and local storage foundation, based on specification commit `aa46ad8`, with the reserved Store identity pinned. [Storage contracts](docs/storage-foundation.md) record the initial schema, repository boundary, freshness/fencing and acceptance limits. Options and Side Panel still display foundation placeholders; the background only configures toolbar opening of the panel. Authentication, provider/synchronization, runtime integration, product UI and release submissions remain future work.
 
 ## Foundation development and verification
 
@@ -23,7 +23,8 @@ On Linux CI, install browser system dependencies with `npx playwright install --
 | `npm run dev` | WXT Chrome MV3 development build |
 | `npm run lint` | TypeScript/React/hooks lint; production test-import restrictions; warnings fail |
 | `npm run typecheck` | Regenerate WXT declarations and independently check strict production/test TypeScript |
-| `npm run test` | Non-watch deterministic shell render tests, including the source alias |
+| `npm run test` | Non-watch deterministic shell, domain and Dexie repository tests |
+| `npm run verify:storage` | Focused domain/storage contracts, transactions, cleanup and freshness tests |
 | `npm run build` | Production MV3 extension at `.output/chrome-mv3` |
 | `npm run check:build` | Inspect the existing production manifest, entries, icons and unwanted test/development artifacts |
 | `npm run test:e2e` | Load the existing production build in isolated Playwright Chromium; check worker, both page mounts and panel behavior configuration |
@@ -37,7 +38,7 @@ Production composition lives in `entrypoints/` and `src/`. Tests live exclusivel
 
 The original foundation icons are a white L on a dark square, checked in at 16, 32, 48 and 128 pixels. Regenerate them with `node scripts/generate-icons.mjs`. Final Store assets and exact-package smoke testing belong to later release work.
 
-The human owner completed the Chrome Web Store **draft** reservation with version **0.1.0**; [release documentation](docs/release/chrome-web-store.md#reserved-chrome-web-store-identity) records the reserved identity. The next upload to this listing must use a version greater than 0.1.0; this identity task does not bump the current version. Production Chrome Extension OAuth setup remains future work. After human review/commit of the identity integration, the next implementation phase is Phase 2 — domain models/contracts/storage; it has not started.
+The human owner completed the Chrome Web Store **draft** reservation with version **0.1.0**; [release documentation](docs/release/chrome-web-store.md#reserved-chrome-web-store-identity) records the reserved identity. The next upload to this listing must use a version greater than 0.1.0; Phase 2 keeps the current version. After human review/commit of Phase 2, the next implementation phase is Phase 3 — Authentication + Remote Identity. Production Chrome Extension OAuth setup remains human-controlled future work.
 
 ## Documentation
 

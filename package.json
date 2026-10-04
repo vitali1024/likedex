@@ -15,14 +15,17 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "wxt prepare && tsc --noEmit",
     "test": "vitest run",
+    "verify:storage": "vitest run tests/unit/domain.test.ts tests/unit/storage.test.ts",
     "build": "wxt build -b chrome --mv3",
     "check:build": "node scripts/check-build.mjs",
     "test:e2e": "playwright test",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build && npm run check:build && npm run test:e2e"
   },
   "dependencies": {
+    "dexie": "4.4.6",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
@@ -34,6 +37,7 @@
     "eslint": "9.39.5",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
+    "fake-indexeddb": "6.2.5",
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.0",
     "vitest": "5.0.3",
