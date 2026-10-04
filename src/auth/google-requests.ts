@@ -121,7 +121,12 @@ export class GoogleAuthorizationRequests {
     assertNotAborted(signal);
     const now = this.timing.now();
     const elapsed = now - budget.startedAt;
-    if (!Number.isFinite(elapsed) || now < budget.lastSeenAt || elapsed < 0 || elapsed >= 600_000) throw new AuthenticationError('request-budget');
+    if (!Number.isFinite(elapsed) || now < budget.lastSeenAt || elapsed < 0 || elapsed >= 600_000) {
+      throw new AuthenticationError('request-budget', { phase: 'runtime', endpoint: null, httpStatus: null,
+        retryOccurred: budget.retries > 0 || budget.recovered,
+        stopReason: !Number.isFinite(elapsed) || now < budget.lastSeenAt || elapsed < 0
+          ? 'session-clock-invalid' : 'session-budget-exceeded' });
+    }
     budget.lastSeenAt = now;
   }
 
@@ -171,7 +176,9 @@ export class GoogleAuthorizationRequests {
         if (delay === null) throw diagnosed;
         if (budget) {
           if (budget.retries >= 6 || this.timing.now() - budget.startedAt + delay >= 600_000) {
-            throw new AuthenticationError('request-budget');
+            throw new AuthenticationError('request-budget', { phase, endpoint, httpStatus,
+              retryOccurred: budget.retries > 0 || budget.recovered,
+              stopReason: budget.retries >= 6 ? 'retry-budget-exceeded' : 'session-budget-exceeded' });
           }
           budget.retries++;
         }

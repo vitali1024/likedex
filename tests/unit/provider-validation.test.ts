@@ -11,7 +11,7 @@ import { validationSenderAllowed } from '@/tools/provider-validation/background'
 import { resultSchema, startSchema, type ValidationSummary } from '@/tools/provider-validation/contracts';
 import { NOW, OBSERVED, attempt, owner, success, video } from '../fixtures/storage';
 import { TOKEN_A, channelResponse, chromeIdentity, held, json, timing } from '../fixtures/authentication';
-import { member, membershipPage, metadata, videoId, videosPage } from '../fixtures/provider';
+import { member, membershipPage, metadata, videoId, videosPage, generatedLikesPages } from '../fixtures/provider';
 
 let db: LikedexDatabase;
 let repository: LibraryRepository;
@@ -45,12 +45,13 @@ function setup(bodies: unknown[] = [channelResponse(), membershipPage(), videosP
   const chrome = chromeIdentity();
   const fetcher = vi.fn<FetchBoundary>();
   bodies.forEach((body) => fetcher.mockImplementationOnce(async () => json(body)));
-  const requests = new GoogleAuthorizationRequests(new ChromeIdentityAdapter(chrome), fetcher, timing());
+  const clock = timing();
+  const requests = new GoogleAuthorizationRequests(new ChromeIdentityAdapter(chrome), fetcher, clock);
   const abort = new AbortController();
   const progress: ValidationSummary[] = [];
   const run = () => observeProvider(requests, () => repository.readObservationSnapshot(NOW), abort.signal,
     (summary) => progress.push(summary), () => NOW, () => '00000000-0000-4000-8000-000000000090');
-  return { chrome, fetcher, requests, abort, progress, run };
+  return { chrome, fetcher, requests, clock, abort, progress, run };
 }
 describe('Human release observation is non-destructive', () => {
   it('returns safe bootstrap failure diagnostics without acquiring mutation capabilities', async () => {
@@ -77,7 +78,7 @@ describe('Human release observation is non-destructive', () => {
     });
     const scan = setup();
     const result = await scan.run();
-    expect(result).toEqual({ status: 'success', summary: {
+    expect(result).toMatchObject({ status: 'success', summary: {
       mode: 'observation-only', productionSyncGate: 'closed', bootstrapValidated: true, trustedCompletion: true,
       pages: 1, rawMemberships: 1, uniqueMemberships: 1, duplicateVideoItems: 0, estimatedTotal: 1,
       hydrationPages: 1, hydrated: 1, lookupOmitted: 0, withoutRichMetadata: 0, unavailable: 0, unknownAvailability: 0,
@@ -90,6 +91,66 @@ describe('Human release observation is non-destructive', () => {
     }
     expect(scan.chrome.getAuthToken.mock.calls.every(([args]) => args?.interactive === false)).toBe(true);
     expect(resultSchema.safeParse(result).success).toBe(true);
+  });
+  it('observes the generated 3547-item chain without mutation and exposes only safe page facts', async () => {
+    const generated = generatedLikesPages();
+    const scan = setup([channelResponse(), ...generated.flatMap((page) => [page.membership, page.hydration])]);
+    const result = await scan.run();
+    expect(result).toMatchObject({ status: 'success', summary: { pages: 71, rawMemberships: 3547,
+      uniqueMemberships: 3547, hydrated: 3547, hydrationPages: 71, trustedCompletion: true },
+    enumerationDiagnostic: { reasonCode: 'trusted-complete', observedMembershipCount: 3547,
+      expectedTotal: 3547, reportedTotal: 3547, lastResponseHadNextPageToken: false, internalStop: 'none' } });
+    expect(result.enumerationDiagnostic.pageChain).toHaveLength(71);
+    expect(result.enumerationDiagnostic.pageChain[7]).toMatchObject({ pageOrdinal: 8, tokenRelation: 'fresh',
+      itemCount: 50, hydrationRequestedCount: 50, hydrationReturnedCount: 50 });
+    expect(result.enumerationDiagnostic.pageChain.at(-1)).toMatchObject({ pageOrdinal: 71, tokenRelation: 'none',
+      itemCount: 47, hydrationRequestedCount: 47, hydrationReturnedCount: 47 });
+    for (const secret of [TOKEN_A, 'owner-a', 'likes-owner-a', 'source-1', videoId(), 'Video 1', 'opaque +/=']) {
+      expect(JSON.stringify(result)).not.toContain(secret);
+    }
+    expect(resultSchema.safeParse({ ...result, enumerationDiagnostic: { ...result.enumerationDiagnostic,
+      pageChain: [{ ...result.enumerationDiagnostic.pageChain[0], pageToken: 'private' }] } }).success).toBe(false);
+  });
+  it('distinguishes seven accepted pages from a rejected eighth premature terminal', async () => {
+    const generated = generatedLikesPages();
+    const scan = setup([channelResponse(), ...generated.slice(0, 7).flatMap((page) => [page.membership, page.hydration]),
+      membershipPage([], undefined, 3547)]);
+    const result = await scan.run();
+    expect(result).toMatchObject({ status: 'failed', summary: { pages: 7, rawMemberships: 350, hydrated: 350,
+      trustedCompletion: false }, error: { category: 'untrusted-enumeration', messageKey: 'enumeration-untrusted' },
+    enumerationDiagnostic: { reasonCode: 'pagination-premature-terminal', observedMembershipCount: 350,
+      expectedTotal: 3547, reportedTotal: 3547, lastResponseHadNextPageToken: false, internalStop: 'none' } });
+    expect(result.enumerationDiagnostic.pageChain.at(-1)).toEqual({ pageOrdinal: 8, itemCount: 0,
+      totalResults: 3547, resultsPerPage: 0, hadNextPageToken: false, tokenRelation: 'none',
+      hydrationRequestedCount: null, hydrationReturnedCount: null });
+    expect(scan.fetcher).toHaveBeenCalledTimes(16); // bootstrap + 14 accepted calls + failed response
+  });
+  it.each([
+    ['repeated', ['a', 'a'], 'pagination-token-repeat'],
+    ['cyclic', ['a', 'b', 'a'], 'pagination-token-cycle'],
+  ] as const)('reports %s token relations without tokens', async (relation, tokens, reasonCode) => {
+    const scan = setup([channelResponse(), ...tokens.flatMap((token, index) => [
+      membershipPage([member(index + 1)], token, null), videosPage([metadata(index + 1)])])]);
+    const result = await scan.run();
+    expect(result).toMatchObject({ status: 'failed', enumerationDiagnostic: { reasonCode, internalStop: 'none' } });
+    expect(result.enumerationDiagnostic.pageChain.at(-1)).toMatchObject({ tokenRelation: relation,
+      hadNextPageToken: true, hydrationRequestedCount: null, hydrationReturnedCount: null });
+  });
+  it.each([
+    [membershipPage([], 'fresh-private-token', 2), 'pagination-empty-continuation'],
+    [membershipPage([member(2)], undefined, 3), 'pagination-total-changed'],
+    [{ ...membershipPage([member(2)], undefined, 2), pageInfo: { totalResults: 2, resultsPerPage: 0 } }, 'pagination-page-count-mismatch'],
+    [membershipPage([member(2)], undefined, 2), 'trusted-complete'],
+    [membershipPage([member(1)], undefined, 2), 'membership-source-duplicate'],
+    [membershipPage([{ ...member(2), snippet: { ...member(2).snippet, playlistId: 'private-playlist' } }], undefined, 2), 'membership-playlist-conflict'],
+    [membershipPage([{ ...member(2), contentDetails: { videoId: videoId(3) } }], undefined, 2), 'membership-video-id-conflict'],
+    [membershipPage([{ ...member(2), contentDetails: {}, snippet: { ...member(2).snippet, resourceId: { kind: 'youtube#video' } } } as ReturnType<typeof member>], undefined, 2), 'membership-video-id-missing'],
+  ])('reports precise safe trust reason %#', async (last, reasonCode) => {
+    const scan = setup([channelResponse(), membershipPage([member(1)], 'private-token', 2), videosPage(), last, videosPage([metadata(2)])]);
+    const result = await scan.run();
+    expect(result.enumerationDiagnostic.reasonCode).toBe(reasonCode);
+    expect(result.enumerationDiagnostic.pageChain.at(-1)?.pageOrdinal).toBe(2);
+    for (const secret of ['private-token', 'private-playlist', videoId(2)]) expect(JSON.stringify(result)).not.toContain(secret);
   });
   it('trusted empty cannot prune seeded unrelated membership or replace latest success', async () => {
     const scan = setup([channelResponse(), membershipPage([])]);
@@ -121,8 +182,40 @@ describe('Human release observation is non-destructive', () => {
   });
   it('partial enumeration preserves aggregate progress but never claims success', async () => {
     const scan = setup([channelResponse(), membershipPage([member()], 'next-secret', 2), videosPage(), { items: [] }]);
-    expect(await scan.run()).toMatchObject({ status: 'failed', summary: { trustedCompletion: false, pages: 1, uniqueMemberships: 1 } });
+    expect(await scan.run()).toMatchObject({ status: 'failed', summary: { trustedCompletion: false, pages: 1, uniqueMemberships: 1 },
+      enumerationDiagnostic: { reasonCode: 'malformed-response', reportedTotal: null, lastResponseHadNextPageToken: null } });
     expect(scan.progress.every((summary) => !summary.trustedCompletion)).toBe(true);
+  });
+  it.each([false, true])('reports elapsed-session versus invalid-clock stops (backward=%s)', async (backward) => {
+    const scan = setup([channelResponse()]);
+    let now = Date.parse(NOW); scan.clock.now = () => now;
+    scan.fetcher.mockImplementationOnce(async () => {
+      now += backward ? -1000 : 600_000;
+      return json(membershipPage([]));
+    });
+    const reasonCode = backward ? 'session-clock-invalid' : 'session-budget-exceeded';
+    expect(await scan.run()).toMatchObject({ status: 'failed', error: { category: 'provider' },
+      enumerationDiagnostic: { reasonCode, internalStop: reasonCode } });
+  });
+  it('reports aggregate retry exhaustion without implying a page/request-count cap', async () => {
+    const scan = setup([channelResponse()]); let attempts = 0;
+    scan.fetcher.mockImplementation(async (url) => {
+      if (++attempts % 3 !== 0) return json({}, 503);
+      return json(new URL(url).pathname.endsWith('playlistItems')
+        ? membershipPage([member(attempts)], `private-token-${attempts}`, null) : videosPage([]));
+    });
+    expect(await scan.run()).toMatchObject({ status: 'failed',
+      enumerationDiagnostic: { reasonCode: 'retry-budget-exceeded', internalStop: 'retry-budget-exceeded' } });
+    expect(scan.clock.sleep).toHaveBeenCalledTimes(6);
+  });
+  it('reports exhausted per-fetch timeouts independently of trust failures', async () => {
+    const scan = setup([channelResponse()]);
+    const expired = AbortSignal.abort();
+    Object.assign(scan.clock, { timeout: (ms: number) => ms === 20_000 ? expired : new AbortController().signal });
+    scan.fetcher.mockImplementation(async () => json(membershipPage([])));
+    expect(await scan.run()).toMatchObject({ status: 'failed',
+      enumerationDiagnostic: { reasonCode: 'request-timeout', internalStop: 'request-timeout' } });
+    expect(scan.clock.sleep).toHaveBeenCalledTimes(2);
   });
   it('hydration transport failure does not treat membership as a successful empty scan', async () => {
     const scan = setup([channelResponse(), membershipPage()]);

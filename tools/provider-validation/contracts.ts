@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { errorSchema } from '../../src/domain/contracts';
 import { authenticationDiagnosticSchema } from '../../src/auth/errors';
+import { membershipPageDiagnosticSchema, providerReasonSchema } from '../../src/provider/diagnostics';
 
 export const VALIDATION_PORT = 'likedex-release-provider-observation-v1';
 export const startSchema = z.strictObject({ operation: z.literal('OBSERVE_PROVIDER') });
@@ -13,10 +14,19 @@ export const summarySchema = z.strictObject({
   lookupOmitted: counter, withoutRichMetadata: counter, unavailable: counter, unknownAvailability: counter,
 });
 export type ValidationSummary = z.infer<typeof summarySchema>;
+export const enumerationDiagnosticSchema = z.strictObject({
+  pageChain: z.array(membershipPageDiagnosticSchema),
+  reasonCode: z.union([providerReasonSchema, authenticationDiagnosticSchema.shape.errorCode,
+    z.enum(['trusted-complete', 'session-budget-exceeded', 'retry-budget-exceeded', 'session-clock-invalid'])]),
+  observedMembershipCount: counter, expectedTotal: counter.nullable(), reportedTotal: counter.nullable(),
+  lastResponseHadNextPageToken: z.boolean().nullable(),
+  internalStop: z.enum(['none', 'session-budget-exceeded', 'retry-budget-exceeded', 'session-clock-invalid', 'request-timeout', 'cancelled']),
+});
 export const resultSchema = z.discriminatedUnion('status', [
-  z.strictObject({ status: z.literal('success'), summary: summarySchema.extend({ trustedCompletion: z.literal(true) }) }),
+  z.strictObject({ status: z.literal('success'), summary: summarySchema.extend({ trustedCompletion: z.literal(true) }),
+    enumerationDiagnostic: enumerationDiagnosticSchema }),
   z.strictObject({ status: z.literal('failed'), summary: summarySchema.extend({ trustedCompletion: z.literal(false) }),
-    error: errorSchema, diagnostic: authenticationDiagnosticSchema.optional() }),
+    error: errorSchema, diagnostic: authenticationDiagnosticSchema.optional(), enumerationDiagnostic: enumerationDiagnosticSchema }),
 ]);
 export type ValidationResult = z.infer<typeof resultSchema>;
 export const eventSchema = z.discriminatedUnion('event', [

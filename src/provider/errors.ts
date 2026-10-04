@@ -1,5 +1,6 @@
 import { AuthenticationError } from '../auth/errors';
 import type { DomainError } from '../domain/contracts';
+import type { ProviderReason } from './diagnostics';
 
 const codes = {
   'malformed-response': ['malformed-provider', 'provider-invalid'],
@@ -13,7 +14,11 @@ const codes = {
 
 export class ProviderError extends Error {
   readonly detail: DomainError;
-  constructor(readonly code: keyof typeof codes) {
+  constructor(readonly code: keyof typeof codes, readonly reason: ProviderReason =
+    code === 'unmappable-membership' ? 'membership-item-invalid'
+      : code === 'duplicate-source' ? 'membership-source-duplicate'
+        : code === 'pagination-integrity' ? 'completion-proof-invalid'
+          : code === 'count-integrity' ? 'pagination-count-mismatch' : code) {
     super(`Likedex provider: ${code}`);
     this.name = 'ProviderError';
     const [category, messageKey] = codes[code];

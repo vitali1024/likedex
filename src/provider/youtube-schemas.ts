@@ -36,20 +36,25 @@ export function canonicalTimestamp(value: string | undefined): string | null {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
-export function validateMembershipPage(value: unknown, playlistId: string) {
+// Internal envelope hook runs before trust checks, so a rejected page can be
+// diagnosed. Its opaque token stays inside ingestion; only safe facts leave it.
+export function validateMembershipPage(value: unknown, playlistId: string,
+  envelopeObserved?: (page: z.infer<typeof playlistEnvelope>) => void) {
   const envelope = playlistEnvelope.safeParse(value);
   if (!envelope.success) throw new ProviderError('malformed-response');
   const page = envelope.data;
-  if (page.pageInfo.resultsPerPage !== page.items.length) throw new ProviderError('count-integrity');
+  envelopeObserved?.(page);
+  if (page.pageInfo.resultsPerPage !== page.items.length) throw new ProviderError('count-integrity', 'pagination-page-count-mismatch');
   const memberships = page.items.map((raw): Membership => {
     const result = playlistItem.safeParse(raw);
     if (!result.success) throw new ProviderError('unmappable-membership');
     const item = result.data;
     const snippetId = item.snippet.resourceId.videoId;
     const detailsId = item.contentDetails.videoId;
-    if (item.snippet.playlistId !== playlistId || (snippetId === undefined && detailsId === undefined)
-      || (snippetId !== undefined && detailsId !== undefined && snippetId !== detailsId)) {
-      throw new ProviderError('unmappable-membership');
+    if (item.snippet.playlistId !== playlistId) throw new ProviderError('unmappable-membership', 'membership-playlist-conflict');
+    if (snippetId === undefined && detailsId === undefined) throw new ProviderError('unmappable-membership', 'membership-video-id-missing');
+    if (snippetId !== undefined && detailsId !== undefined && snippetId !== detailsId) {
+      throw new ProviderError('unmappable-membership', 'membership-video-id-conflict');
     }
     return { sourceId: item.id, videoId: snippetId ?? detailsId!,
       likedAt: canonicalTimestamp(item.snippet.publishedAt), position: item.snippet.position ?? null };

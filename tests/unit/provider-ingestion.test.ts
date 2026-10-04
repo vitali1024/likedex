@@ -7,7 +7,7 @@ import { YouTubeLikedVideosProvider, isTrustedProviderCompletion, type ProviderE
 import { canonicalTimestamp, durationSeconds } from '@/src/provider/youtube-schemas';
 import { videoSchema } from '@/src/domain/contracts';
 import { TOKEN_A, TOKEN_B, bootstrap, channelResponse, chromeIdentity, held, json, timing } from '../fixtures/authentication';
-import { context, member, membershipPage, metadata, videoId, videosPage } from '../fixtures/provider';
+import { context, member, membershipPage, metadata, videoId, videosPage, generatedLikesPages } from '../fixtures/provider';
 
 function setup(bodies: unknown[] = [membershipPage(), videosPage()]) {
   const chrome = chromeIdentity();
@@ -33,6 +33,35 @@ async function rejectsWithoutCompletion(body: unknown, code?: string) {
 afterEach(() => vi.useRealTimers());
 
 describe('Provider request shape and streaming (AC-RECON-005/006)', () => {
+  it('traverses 3547 memberships / 71 pages with opaque tokens, batched hydration and terminal-only trust', async () => {
+    const generated = generatedLikesPages();
+    const scan = setup(generated.flatMap((page) => [page.membership, page.hydration]));
+    const iterator = scan.provider.enumerateLikedVideos(context, scan.abort.signal);
+    for (const [index, fixture] of generated.entries()) {
+      const event = (await iterator.next()).value!;
+      expect(event).toMatchObject({ kind: 'page', pageNumber: index + 1,
+        terminal: index === 70, progress: { rawItems: Math.min((index + 1) * 50, 3547) } });
+      expect(isTrustedProviderCompletion(event)).toBe(false);
+      expect(scan.fetcher).toHaveBeenCalledTimes((index + 1) * 2);
+      const membershipUrl = new URL(scan.fetcher.mock.calls[index * 2]![0]);
+      expect(membershipUrl.searchParams.get('pageToken')).toBe(index === 0 ? null : generated[index - 1]!.next);
+      expect(membershipUrl.searchParams.get('maxResults')).toBe('50');
+      const hydrationUrl = new URL(scan.fetcher.mock.calls[index * 2 + 1]![0]);
+      expect(hydrationUrl.pathname).toBe('/youtube/v3/videos');
+      expect(hydrationUrl.searchParams.get('id')?.split(',')).toEqual(fixture.hydration.items.map((item) => item.id));
+      expect(hydrationUrl.searchParams.has('pageToken')).toBe(false);
+    }
+    const completion = (await iterator.next()).value!;
+    expect(isTrustedProviderCompletion(completion)).toBe(true);
+    expect(completion).toMatchObject({ kind: 'trusted-complete', progress: {
+      pagesAccepted: 71, rawItems: 3547, uniqueMembership: 3547, duplicateVideoItems: 0, estimatedTotal: 3547 } });
+    if (completion.kind === 'trusted-complete') {
+      expect(completion.membershipVideoIds).toHaveLength(3547);
+      expect(completion.pageChain).toHaveLength(71);
+    }
+    expect((await iterator.next()).done).toBe(true);
+    expect(scan.clock.sleep).not.toHaveBeenCalled();
+  });
   it('uses authoritative Likes ID and exact GET parts, batches and maps the existing domain', async () => {
     const scan = setup();
     expect(scan.fetcher).not.toHaveBeenCalled();

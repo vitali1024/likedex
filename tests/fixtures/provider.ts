@@ -22,3 +22,13 @@ export function metadata(index = 1) {
     contentDetails: { duration: 'PT4M5S' }, status: { privacyStatus: 'public', uploadStatus: 'processed' } };
 }
 export function videosPage(items = [metadata()]) { return { kind: 'youtube#videoListResponse', items }; }
+
+// Generated TEST fixture only; opaque token punctuation must survive URL encoding.
+export function generatedLikesPages(total = 3547) {
+  return Array.from({ length: Math.ceil(total / 50) }, (_, pageIndex) => {
+    const indices = Array.from({ length: Math.min(50, total - pageIndex * 50) }, (_, index) => pageIndex * 50 + index + 1);
+    const next = pageIndex + 1 < Math.ceil(total / 50) ? `opaque +/= ${pageIndex + 1} ?&` : undefined;
+    return { next, membership: membershipPage(indices.map((index) => member(index)), next, total),
+      hydration: videosPage(indices.map((index) => metadata(index))) };
+  });
+}

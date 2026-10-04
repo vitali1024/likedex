@@ -4,6 +4,7 @@ import { authenticatedBootstrapSchema } from '../domain/authentication';
 import { videoSchema, type Freshness, type MirroredVideo } from '../domain/contracts';
 import { retentionDeadline } from '../domain/freshness';
 import { ProviderError, providerFailure } from './errors';
+import type { MembershipPageDiagnostic } from './diagnostics';
 import { bestThumbnail, durationSeconds, canonicalTimestamp, validateMembershipPage, validateVideos,
   type Membership, type VideoMetadata } from './youtube-schemas';
 
@@ -98,7 +99,8 @@ function mapRecord(member: Membership, sourceIds: string[], metadata: VideoMetad
 }
 
 export class YouTubeLikedVideosProvider {
-  constructor(private readonly requests: Requests) {}
+  constructor(private readonly requests: Requests,
+    private readonly observePage?: (page: MembershipPageDiagnostic | null) => void) {}
 
   // A page authorizes only prospective safe updates. Returning early, aborting,
   // or any failure leaves the caller without a terminal completeness capability.
@@ -119,22 +121,37 @@ export class YouTubeLikedVideosProvider {
       let pages = 0;
       for (;;) {
         session.assertActive();
-        const page = await session.playlistItems(next, (body) => validateMembershipPage(body, context.owner.likesPlaylistId));
+        // Null marks a new request whose response facts are not yet validated.
+        this.observePage?.(null);
+        let diagnostic: MembershipPageDiagnostic | undefined;
+        const page = await session.playlistItems(next, (body) => validateMembershipPage(body, context.owner.likesPlaylistId, (envelope) => {
+          if (!this.observePage) return;
+          const token = envelope.nextPageToken;
+          diagnostic = { pageOrdinal: pages + 1, itemCount: envelope.items.length,
+            totalResults: envelope.pageInfo.totalResults ?? null, resultsPerPage: envelope.pageInfo.resultsPerPage,
+            hadNextPageToken: token !== undefined, tokenRelation: token === undefined ? 'none'
+              : token === next ? 'repeated' : tokens.has(token) ? 'cyclic' : pages === 0 ? 'first' : 'fresh',
+            hydrationRequestedCount: null, hydrationReturnedCount: null };
+          this.observePage?.({ ...diagnostic });
+        }));
         const membershipAt = session.observedAt();
         if (page.nextPageToken !== undefined) {
-          if (tokens.has(page.nextPageToken) || page.memberships.length === 0) throw new ProviderError('pagination-integrity');
+          if (tokens.has(page.nextPageToken)) throw new ProviderError('pagination-integrity',
+            page.nextPageToken === next ? 'pagination-token-repeat' : 'pagination-token-cycle');
+          if (page.memberships.length === 0) throw new ProviderError('pagination-integrity', 'pagination-empty-continuation');
           tokens.add(page.nextPageToken);
         }
         if (page.estimatedTotal !== null) {
-          if (total !== null && total !== page.estimatedTotal) throw new ProviderError('count-integrity');
+          if (total !== null && total !== page.estimatedTotal) throw new ProviderError('count-integrity', 'pagination-total-changed');
           total = page.estimatedTotal;
         }
         rawItems += page.memberships.length;
-        if (!Number.isSafeInteger(rawItems) || (total !== null && rawItems > total)) throw new ProviderError('count-integrity');
+        if (!Number.isSafeInteger(rawItems)) throw new ProviderError('count-integrity', 'pagination-count-overflow');
+        if (total !== null && rawItems > total) throw new ProviderError('count-integrity', 'pagination-count-exceeds-total');
         const terminal = page.nextPageToken === undefined;
-        if (terminal && total !== null && rawItems !== total) throw new ProviderError('count-integrity');
+        if (terminal && total !== null && rawItems !== total) throw new ProviderError('count-integrity', 'pagination-premature-terminal');
         // A zero total is required for the trusted-empty control case.
-        if (terminal && rawItems === 0 && total !== 0) throw new ProviderError('count-integrity');
+        if (terminal && rawItems === 0 && total !== 0) throw new ProviderError('count-integrity', 'pagination-empty-total-unconfirmed');
         const pageIds = new Set<string>();
         for (const member of page.memberships) {
           if (sources.has(member.sourceId)) throw new ProviderError('duplicate-source');
@@ -145,8 +162,16 @@ export class YouTubeLikedVideosProvider {
           pageIds.add(member.videoId);
         }
         const ids = [...pageIds];
+        if (diagnostic) {
+          diagnostic.hydrationRequestedCount = ids.length;
+          this.observePage?.({ ...diagnostic });
+        }
         const metadata = ids.length === 0 ? new Map<string, VideoMetadata>()
           : await session.videos(ids, (body) => validateVideos(body, ids));
+        if (diagnostic) {
+          diagnostic.hydrationReturnedCount = metadata.size;
+          this.observePage?.({ ...diagnostic });
+        }
         const metadataAt = session.observedAt();
         const records = ids.map((id) => {
           const entry = canonical.get(id)!;

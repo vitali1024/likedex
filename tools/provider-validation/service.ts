@@ -2,8 +2,10 @@ import { AuthenticationError, assertNotAborted } from '../../src/auth/errors';
 import type { GoogleAuthorizationRequests } from '../../src/auth/google-requests';
 import type { LibrarySnapshot } from '../../src/domain/contracts';
 import { ProviderError } from '../../src/provider/errors';
+import type { MembershipPageDiagnostic } from '../../src/provider/diagnostics';
 import { isTrustedProviderCompletion, YouTubeLikedVideosProvider, type IngestionContext } from '../../src/provider/youtube-ingestion';
-import { resultSchema, type ValidationResult, type ValidationSummary } from './contracts';
+import { resultSchema, type ValidationResult, type ValidationSummary, type enumerationDiagnosticSchema } from './contracts';
+import type { z } from 'zod';
 
 type Requests = Pick<GoogleAuthorizationRequests, 'bootstrapSilently' | 'createYouTubeReadSession'>;
 type Preconditions = Pick<LibrarySnapshot, 'control' | 'owner' | 'sync'>;
@@ -17,6 +19,18 @@ export async function observeProvider(requests: Requests, read: () => Promise<Pr
     bootstrapValidated: false, trustedCompletion: false, pages: 0, rawMemberships: 0, uniqueMemberships: 0,
     duplicateVideoItems: 0, estimatedTotal: null, hydrationPages: 0, hydrated: 0, lookupOmitted: 0,
     withoutRichMetadata: 0, unavailable: 0, unknownAvailability: 0 };
+  const pageChain: MembershipPageDiagnostic[] = [];
+  let lastResponseObserved = false;
+  const enumerationDiagnostic = (reasonCode: z.infer<typeof enumerationDiagnosticSchema>['reasonCode'],
+    internalStop: z.infer<typeof enumerationDiagnosticSchema>['internalStop'] = 'none') => {
+    const last = pageChain.at(-1);
+    // These count envelope items, including a rejected response. They do not
+    // claim accepted/mappable membership; summary retains accepted progress.
+    return { pageChain, reasonCode, observedMembershipCount: pageChain.reduce((sum, page) => sum + page.itemCount, 0),
+      expectedTotal: pageChain.find((page) => page.totalResults !== null)?.totalResults ?? null,
+      reportedTotal: lastResponseObserved ? last?.totalResults ?? null : null,
+      lastResponseHadNextPageToken: lastResponseObserved ? last?.hadNextPageToken ?? null : null, internalStop };
+  };
   try {
     const initial = await read();
     const check = async () => {
@@ -44,7 +58,10 @@ export async function observeProvider(requests: Requests, read: () => Promise<Pr
     // Ephemeral UUID for provider provenance only; never a durable sync attempt.
     const context: IngestionContext = { attemptId: nextId(), owner,
       dataGeneration: initial.control.dataGeneration, authEpoch: initial.control.authEpoch };
-    const provider = new YouTubeLikedVideosProvider(requests);
+    const provider = new YouTubeLikedVideosProvider(requests, (page) => {
+      lastResponseObserved = page !== null;
+      if (page) pageChain[page.pageOrdinal - 1] = page;
+    });
     const metrics = new Map<string, { omitted: boolean; richMissing: boolean; state: string }>();
     let completed = false;
     for await (const event of provider.enumerateLikedVideos(context, signal)) {
@@ -78,14 +95,19 @@ export async function observeProvider(requests: Requests, read: () => Promise<Pr
       }
     }
     await check();
-    if (!completed) throw new ProviderError('pagination-integrity');
+    if (!completed) throw new ProviderError('pagination-integrity', 'completion-proof-missing');
     summary.trustedCompletion = true;
-    return resultSchema.parse({ status: 'success', summary });
+    return resultSchema.parse({ status: 'success', summary, enumerationDiagnostic: enumerationDiagnostic('trusted-complete') });
   } catch (error) {
     summary.trustedCompletion = false;
     const detail = error instanceof AuthenticationError || error instanceof ProviderError
       ? error.detail : new AuthenticationError('unexpected').detail;
+    const stop = error instanceof AuthenticationError ? error.diagnostic?.stopReason
+      ?? (error.code === 'request-timeout' || error.code === 'cancelled' ? error.code : 'none') : 'none';
+    const reason = error instanceof ProviderError ? error.reason
+      : error instanceof AuthenticationError ? error.diagnostic?.stopReason ?? error.code : 'unexpected';
     return resultSchema.parse({ status: 'failed', summary, error: detail,
+      enumerationDiagnostic: enumerationDiagnostic(reason, stop),
       ...(error instanceof AuthenticationError && error.diagnostic ? { diagnostic: error.diagnostic } : {}) });
   }
 }

@@ -73,11 +73,14 @@ test('separate validation package uses Options Connect, observes without writes,
   const prelude = `(() => {
     chrome.runtime.onConnect.addListener((port) => { globalThis.validationTestSender = { id: port.sender?.id, url: port.sender?.url, hasTab: port.sender?.tab !== undefined }; });
     const fixtures = ${JSON.stringify(fixtures)};
+    globalThis.validationPrematureTerminal = false;
     chrome.identity.getAuthToken = async () => ({ token: fixtures.token, grantedScopes: ['https://www.googleapis.com/auth/youtube.readonly'] });
     globalThis.fetch = async (input) => {
       const url = new URL(String(input));
       const body = url.pathname.endsWith('/channels') ? fixtures.channel
-        : url.pathname.endsWith('/playlistItems') ? url.searchParams.has('pageToken') ? fixtures.second : fixtures.first
+        : url.pathname.endsWith('/playlistItems') ? url.searchParams.has('pageToken')
+          ? globalThis.validationPrematureTerminal ? { ...fixtures.second, items: [], pageInfo: { totalResults: 2, resultsPerPage: 0 } } : fixtures.second
+          : fixtures.first
         : url.pathname.endsWith('/videos') ? url.searchParams.get('id')?.includes('0000000002') ? fixtures.metadataSecond : fixtures.metadataFirst
         : undefined;
       if (!body) throw new Error('Unexpected test request category.');
@@ -133,12 +136,26 @@ test('separate validation package uses Options Connect, observes without writes,
     await expect(page.getByText('Observation succeeded with genuine trusted provider completion.', { exact: false })).toBeVisible();
     const evidence = JSON.parse((await page.locator('pre').textContent())!);
     expect(evidence).toMatchObject({ status: 'success', summary: { trustedCompletion: true, pages: 2, rawMemberships: 2, hydrated: 2, productionSyncGate: 'closed' } });
+    expect(evidence.enumerationDiagnostic).toMatchObject({ reasonCode: 'trusted-complete', internalStop: 'none',
+      observedMembershipCount: 2, expectedTotal: 2, reportedTotal: 2, lastResponseHadNextPageToken: false,
+      pageChain: [{ pageOrdinal: 1, tokenRelation: 'first', hydrationRequestedCount: 1, hydrationReturnedCount: 1 },
+        { pageOrdinal: 2, tokenRelation: 'none', hydrationRequestedCount: 1, hydrationReturnedCount: 1 }] });
     expect(JSON.stringify(evidence)).not.toContain(TOKEN_A);
     expect(await raw()).toEqual(before);
     const gate = await page.evaluate(() => (globalThis as unknown as { chrome: typeof browser }).chrome.runtime.sendMessage({
       protocolVersion: 1, requestId: crypto.randomUUID(), operation: 'SYNC_START', payload: {},
     }));
     expect(gate).toMatchObject({ ok: false, error: { code: 'provider-validation-required' } });
+    expect(await raw()).toEqual(before);
+    await worker.evaluate(() => { (globalThis as unknown as { validationPrematureTerminal: boolean }).validationPrematureTerminal = true; });
+    await page.getByRole('button', { name: 'Observe provider without syncing' }).click();
+    await expect(page.getByText('Observation failed: untrusted-enumeration', { exact: false })).toBeVisible();
+    const failedEvidence = JSON.parse((await page.locator('pre').textContent())!);
+    expect(failedEvidence).toMatchObject({ status: 'failed', summary: { pages: 1, rawMemberships: 1, trustedCompletion: false },
+      enumerationDiagnostic: { reasonCode: 'pagination-premature-terminal', observedMembershipCount: 1, expectedTotal: 2,
+        reportedTotal: 2, lastResponseHadNextPageToken: false, internalStop: 'none',
+        pageChain: [{ pageOrdinal: 1, itemCount: 1 }, { pageOrdinal: 2, itemCount: 0, hydrationRequestedCount: null }] } });
+    for (const secret of [TOKEN_A, 'synthetic-next', 'source-1', 'owner-a', 'Video 1']) expect(JSON.stringify(failedEvidence)).not.toContain(secret);
     expect(await raw()).toEqual(before);
     await page.clock.install();
     await page.clock.fastForward(600_001);

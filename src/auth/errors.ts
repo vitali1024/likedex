@@ -34,6 +34,7 @@ export const authenticationDiagnosticSchema = z.strictObject({
   httpStatus: z.number().int().min(100).max(599).nullable(),
   errorCode: z.enum(Object.keys(errors) as [AuthenticationErrorCode, ...AuthenticationErrorCode[]]),
   retryOccurred: z.boolean(),
+  stopReason: z.enum(['session-budget-exceeded', 'retry-budget-exceeded', 'session-clock-invalid']).optional(),
 });
 export type AuthenticationDiagnostic = z.infer<typeof authenticationDiagnosticSchema>;
 type DiagnosticContext = Omit<AuthenticationDiagnostic, 'errorCode'>;

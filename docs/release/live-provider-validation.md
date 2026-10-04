@@ -18,6 +18,8 @@ Use a real authorized YouTube account with the production Likedex extension/OAut
 
 ## Pending evidence record
 
+A human-reported failed observation had validated bootstrap, seven accepted/hydrated pages, 350 raw/unique memberships against reported total 3,547, and `untrusted-enumeration / enumeration-untrusted`. Successful completion/approval is still pending. The exact live trust branch and original time/build context were not supplied. See [pagination diagnosis](provider-pagination-diagnosis.md) for the branch audit, safe diagnostic patch and one required human retry. Do not interpret the accepted-page summary as proof of a seven-page or 350-item provider cap.
+
 Fill only from actual execution; unchecked fields are not success claims. Never record OAuth tokens, credentials, raw sensitive response bodies, personal liked-video content or opaque page tokens. Use aggregate counts only where safe; identify the account only by a non-sensitive label if necessary.
 
 | Field | Actual evidence |
