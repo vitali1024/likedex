@@ -48,7 +48,19 @@ Required owner/auth checks that cannot validate access, or confirmed authorizati
 
 Successful finalization refreshes only facts actually observed: owner, enumerated membership and returned metadata. Derived success/current-attempt freshness inherits the earliest retained relevant factual deadline. Omitted old metadata and bounded prior-result evidence keep their original deadlines and can conservatively constrain whole-dataset expiry even after another successful sync. Partial progress cannot renew untouched membership, prior success or complete-dataset freshness. No scheduler or alarms permission is added.
 
-**Code correctness implemented; production release pruning validation remains pending.** Phase 4's live-provider assumption gate still requires authorized observations of private/deleted representation, required containers, totals/tokens, origins and completeness/cap assumptions before enabling affected production pruning. No live account/API test was performed. This service is not wired into production entrypoints. A minimal code flag was not invented; Phase 6/later composition and release review must retain this gate. Any contradicted assumption requires the stop/amendment process.
+**Code correctness implemented; production release pruning validation remains pending.** No live account/API test was performed. This service is not wired into production entrypoints. The pending observation is a release-safety prerequisite, not evidence that the provider design is incorrect. Any contradicted assumption requires the stop/amendment process.
+
+## Production live-provider validation gate
+
+Human decision, **2026-10-04**: Phase 6 may implement runtime/MV3 integration and test it deterministically before live-provider validation. Production composition must default to a **closed** provider validation gate until successful live observation and explicit human approval are recorded. Missing, malformed or unapproved configuration must leave the gate closed; fixture results cannot enable it automatically, and runtime callers cannot override it.
+
+For a valid production `SYNC START` request while closed, return the explicit, machine-testable typed result **`provider-validation-required`** before invoking the synchronization service or any request-induced storage mutation. Do not create/persist a new attempt, launch ingestion, alter mirrored videos or owner/library state, renew synchronization freshness, invoke trusted finalization, or prune membership. The request does not perform even a bookkeeping write. Production routing must offer no alternate path that bypasses the gate to run synchronization/finalization/pruning.
+
+Independent startup, retention, authorization cleanup and explicit data controls retain their approved obligations. Their separately triggered recovery/deletion is not a side effect of a rejected Sync request and must not be suppressed by this release gate or described as reconciliation.
+
+Deterministic tests may explicitly inject an enabled gate into separate test composition to exercise prompt persisted acknowledgement, active runs, duplicate starts, truthful failure/status, cross-client observation and worker recovery. The production build must contain real adapters and no fixture activation switch. Opening the test gate does not change the provider completion/provenance checks, owner-check receipt, trusted finalizer or pruning invariants.
+
+`provider-validation-required` is a pre-release safety state. Before Store release, follow the [pending live-validation procedure](release/live-provider-validation.md): observe the real provider without local pruning unless separately authorized, preserve sanitized evidence, obtain explicit human approval, deliberately enable production synchronization/pruning, rerun full verification, then perform real-account smoke testing. It is not the intended normal public state after this prerequisite is satisfied. This amendment specifies future composition; it implements no gate code and claims no live validation or enablement.
 
 ## Deterministic verification and traceability
 

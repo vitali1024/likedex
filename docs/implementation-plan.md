@@ -64,7 +64,7 @@ Each phase ends at a reviewable commit boundary, subject to commit authorization
 
 - **Objective/scope:** validate/map identity, membership pages, metadata, errors, unknown values, duplicates and page-chain evidence; GET-only data adapter.
 - **Expected artifacts:** future provider schemas/adapter, sanitized synthetic fixtures, contract tests, documented API observations.
-- **Gate:** AC-RECON-003–011 provider cases, retry classification and metadata provenance; real provider check supports completeness assumptions. Any incompatible API behavior stops pruning work for amendment.
+- **Gate:** AC-RECON-003–011 provider cases, retry classification and metadata provenance. Live observation supports completeness assumptions before production enablement through the human-controlled milestone below; its pending state permits Phase 6 development with the production gate closed. Any incompatible API behavior stops affected work for amendment; deterministic trust semantics must not be weakened.
 - **Command:** `npm run verify:provider`, then `npm run verify`.
 - **Maker/effort:** GPT-6.1 Sol, High.
 - **Review:** human decision required for a contradicted provider assumption; checker examines boundary in Phase 12.
@@ -83,12 +83,13 @@ Each phase ends at a reviewable commit boundary, subject to commit authorization
 ### Phase 6 — MV3 persistence and runtime messaging
 
 - **Objective/scope:** durable prompt start, worker recovery, typed RPC contracts, message handlers/routing, fencing and authoritative observation; integrate Phase 3 auth services through Connect, connection-status and Disconnect messages. Enforce earliest dataset/auth deadlines before use, on startup/resume and through active-context timers, invoking session/periodic authorization validation and cleanup services. Expiry deletes the whole authorized dataset conservatively without starting an automatic sync.
+- **Production enablement boundary:** implement runtime/MV3 integration with the [provider validation gate](synchronization.md#production-live-provider-validation-gate) defaulting closed. Valid production Sync requests return typed `provider-validation-required` before invoking sync or any request-induced storage mutation; no new attempt, ingestion, owner/video mutation, synchronization freshness refresh, finalization or pruning. Independent lifecycle/cleanup duties continue. Explicitly injected enabled test composition verifies running-sync behavior; it cannot enable production. Missing/malformed configuration fails closed. Live validation is a later human-controlled prerequisite to production enablement, not a prerequisite to Phase 6 deterministic implementation.
 - **Expected artifacts:** future coordinator/runtime modules, auth/runtime and lifecycle/message integration tests, revision subscriber. Product connection/onboarding UI remains in Phases 7–8.
-- **Gate:** runtime portions of AC-AUTH-001–009 and AC-IDENTITY-001–005, AC-SYNC-003/004/007/008/011/012, AC-STORAGE-004 and AC-DATA-013–016; kill/reinitialize worker without losing truth or exposing expired data. Prove idle/wake/timer behavior; add `chrome.alarms` only if a demonstrated gap requires it and justify permission/disclosure changes. Start cannot await enumeration.
+- **Gate:** runtime portions of AC-AUTH-001–009 and AC-IDENTITY-001–005, AC-SYNC-003/004/007/008/011–013, AC-STORAGE-004 and AC-DATA-013–016; kill/reinitialize worker without losing truth or exposing expired data. Prove idle/wake/timer behavior; add `chrome.alarms` only if a demonstrated gap requires it and justify permission/disclosure changes. Enabled-gate start cannot await enumeration; production closed-gate rejection must remain mutation-free.
 - **Command:** `npm run verify:runtime`, then `npm run verify`.
 - **Maker/effort:** GPT-6.1 Sol, High.
 - **Review:** lifecycle/concurrency included in independent checker; human approval for durable-state contract changes.
-- **Deadline:** must complete. **Dependencies:** 3–5. Safe stop: both shell surfaces observe one real attempt.
+- **Deadline:** must complete. **Dependencies:** 3–5. Safe stop: deterministic runtime clients observe one authoritative attempt with an injected enabled gate, and production Sync remains explicitly blocked until the live-validation milestone. Product connection/onboarding and library UI stay in Phases 7–8.
 
 ### Phase 7 — Options library UI
 
@@ -134,6 +135,7 @@ Each phase ends at a reviewable commit boundary, subject to commit authorization
 
 - **11A objective/scope, scheduled immediately after Phase 1:** developer account readiness; package minimal real extension shell; human-controlled draft upload; stable extension ID/public-key strategy; Google Cloud project/API/branding; production Chrome Extension OAuth client bound to that ID. Draft upload does not mean Store review submission.
 - **11B objective/scope, after Phase 10:** revalidate final client/ID/scope, production manifest and account flow, policy/support/domain links, test-user/verification readiness, toolbar identity behavior.
+- **Human-controlled live-provider milestone:** once a safe explicit authorized observation path exists (normally after connection UI), and no later than 11B, follow [live-provider validation](release/live-provider-validation.md) with the production identity. Observe bootstrap, actual Likes pagination/hydration and genuine completion without local pruning unless separately authorized; preserve sanitized evidence → obtain explicit human approval → deliberately enable production synchronization/pruning → rerun full verification → perform real-account smoke testing. Keep the gate closed on missing approval or anomalies. This is required before Store release; it adds no phase or automatic account action. Independent review and final exact-package smoke remain required afterward.
 - **Expected artifacts:** future nonsecret setup record (actual IDs/URLs only when created), manifest/build identity configuration, external draft/client resources, real setup evidence. No secret material in repository.
 - **Gate:** AC-RELEASE-002/003; early ID unblocks Phase 3; later production auth/disconnect, deletion and external-revocation smoke passes.
 - **Command:** `npm run build`, `npm run verify:release`, then `npm run verify`; human external-console checks and production-auth smoke.

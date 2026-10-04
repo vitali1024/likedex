@@ -23,6 +23,8 @@ Status: planned, not executed; B-01 resolved by human decision. IDs are stable a
 
 ## Synchronization and reconciliation
 
+Running-sync criteria use an approved production provider validation gate or an explicitly enabled gate in separate deterministic test composition. Before live approval, production must instead satisfy AC-SYNC-013; this permits Phase 6 runtime/MV3 implementation without claiming production enablement. Provider provenance, owner-check receipts and trusted-finalizer invariants apply unchanged when enabled. Independent retention/authorization cleanup and data controls remain required while the gate is closed.
+
 | ID | Observable acceptance condition | Layer |
 |---|---|---|
 | AC-SYNC-001 | Empty local DB plus a valid nonempty remote sequence produces a persisted owned mirror and committed success with correct counts. | U, S |
@@ -37,6 +39,7 @@ Status: planned, not executed; B-01 resolved by human decision. IDs are stable a
 | AC-SYNC-010 | Daily quota exhaustion, malformed data, permission denial, and identity mismatch do not enter blind transient retry loops. | P, U |
 | AC-SYNC-011 | Runtime loss or invalid status response displays status unavailable; it does not overwrite durable attempt truth or trigger blind mutation replay. | R, E |
 | AC-SYNC-012 | Clear/Disconnect/authorization/expiry cleanup remains serviceable during held page, hydration, backoff or Connect; late writes, finalization and stale Connect/export completion cannot cross generation/auth-epoch/deadline guards. | S, R |
+| AC-SYNC-013 | Before successful live-provider evidence and explicit human approval, production defaults to a closed gate. A valid SYNC START returns typed provider-validation-required before any request-induced storage/sync mutation: no attempt, ingestion, owner/video change, synchronization freshness refresh, bookkeeping/revision write, finalization or pruning. Missing/malformed configuration and automated fixture success cannot enable production; an explicitly injected enabled test gate retains every trust invariant. Independently triggered lifecycle/cleanup duties remain in force. | R, D |
 | AC-RECON-001 | One and several additions and metadata updates are applied; existing unrelated items remain until trusted completion. | U, S |
 | AC-RECON-002 | One and multiple absent videos are pruned only for a trusted completed enumeration of the same owner. | U, S |
 | AC-RECON-003 | Malformed HTTP-200 JSON and schema-invalid success responses cannot delete any pre-existing membership. | P, S |

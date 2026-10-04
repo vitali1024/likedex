@@ -26,6 +26,14 @@ The [implementation plan](../implementation-plan.md#phase-3--authentication-and-
 
 This is an actual Specification-Driven Development correction, not implementation or independent review evidence. The amendment is an unstaged working-tree change at this handoff; link its actual human commit after it exists, without claiming it is already in Git history. Frozen product behavior is unchanged.
 
+## Authorized Phase 6 pruning-gate clarification — 2026-10-04
+
+During Phase 6 preparation at baseline `85745b4`, the maker identified that directly wiring production `SYNC START` to the Phase 5 service would enable finalization/pruning before the committed live-provider prerequisite was satisfied. The maker stopped before editing or implementing runtime code and reported the unresolved prerequisite. No provider incompatibility or failed live validation was observed.
+
+The human product owner chose a fail-closed production provider validation gate: Phase 6 runtime/MV3 integration may be implemented and deterministically tested with an explicitly injected enabled test gate, while valid production Sync requests return typed `provider-validation-required` without request-induced storage/sync mutation until live evidence and explicit human approval permit deliberate enablement. Provider completion provenance, owner-check receipts, the trusted finalizer and pruning invariants remain unchanged. The [implementation plan](../implementation-plan.md#phase-6--mv3-persistence-and-runtime-messaging), [gate contract](../synchronization.md#production-live-provider-validation-gate) and AC-SYNC-013 encode this decision; the [live-validation checklist](../release/live-provider-validation.md) is pending, with no completed observations or approval.
+
+This is an actual Specification-Driven Development clarification. This task authorizes documentation only; no Phase 6 implementation, tests, live-account action, enablement, staging or commit occurred. Link the eventual human amendment commit after it exists. No new formal loop or independent-review evidence is claimed.
+
 ## Final submission and demo
 
 Final Capstone PR should link the five practices in the table, product/engineering definition of done, actual CI/checker state, release package identity, Store submission receipt and OAuth readiness/status. Clearly label external reviews pending; a submission receipt is not approval. No generic autonomy-log, dynamic-context, framework or factory practice claim is planned.
