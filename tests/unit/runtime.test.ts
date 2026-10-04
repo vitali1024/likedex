@@ -9,7 +9,7 @@ import { LibraryRepository, StorageError } from '@/src/storage/repository';
 import { SynchronizationService } from '@/src/sync/service';
 import { RuntimeClient } from '@/src/runtime/client';
 import { RuntimeCoordinator, type LifecycleScheduler } from '@/src/runtime/coordinator';
-import { PRODUCTION_PROVIDER_VALIDATION_APPROVED } from '@/src/runtime/background';
+import { PRODUCTION_PROVIDER_VALIDATION_APPROVED } from '@/src/runtime/production-gate';
 import { type RuntimeOperation, type RuntimeRequest, type RevisionEvent, resultSchemas } from '@/src/runtime/contracts';
 import { attempt, NOW, OBSERVED, owner, success, video } from '../fixtures/storage';
 import { channelResponse, chromeIdentity, held, json, timing } from '../fixtures/authentication';
@@ -91,7 +91,15 @@ describe('Runtime production gate and validation (AC-SYNC-013; AC-SYNC-011)', ()
     else expect(result.error.diagnostic).toBeUndefined();
     expect(JSON.stringify(result)).not.toContain('SECRET');
   });
-  it.each([PRODUCTION_PROVIDER_VALIDATION_APPROVED, undefined, null, 'true', 1, {}, false])(
+  it('committed production approval admits normal preconditions and still rejects disconnected starts', async () => {
+    expect(PRODUCTION_PROVIDER_VALIDATION_APPROVED).toBe(true);
+    const h = await setup({ connected: false, gate: PRODUCTION_PROVIDER_VALIDATION_APPROVED });
+    expect(await h.client().request('SYNC_START')).toMatchObject({ ok: false,
+      error: { code: 'auth-error', detail: { category: 'authentication' } } });
+    expect(h.fetcher).not.toHaveBeenCalled();
+    expect(await h.db.sync.count()).toBe(0);
+  });
+  it.each([false, undefined, null, 'true', 1, {}, 'false'])(
     'closed/missing/malformed gate %j rejects with all records unchanged', async (gate) => {
       const h = await setup({ seed: true, gate });
       const before = await records(h.db);
@@ -150,7 +158,8 @@ describe('Runtime local data/auth and failure truth (AC-AUTH-001/002/003/007/009
     expect(JSON.stringify(result)).not.toContain('synthetic-token');
   });
   it('fresh startup/passive checks never consent; only explicit Connect acquires interactively', async () => {
-    const h = await setup({ connected: false });
+    const h = await setup({ connected: false, gate: PRODUCTION_PROVIDER_VALIDATION_APPROVED });
+    const start = vi.spyOn(h.sync, 'start');
     await h.coordinator.initialize();
     expect(await h.client().request('AUTH_STATUS_GET')).toMatchObject({ ok: true, result: { status: 'auth-required' } });
     expect(await h.client().request('LIBRARY_SNAPSHOT_GET')).toMatchObject({ ok: true, result: { videos: [], owner: null } });
@@ -159,6 +168,9 @@ describe('Runtime local data/auth and failure truth (AC-AUTH-001/002/003/007/009
     expect(h.chrome.getAuthToken.mock.calls[0]![0].interactive).toBe(true);
     expect(await h.db.owner.count()).toBe(0);
     expect(await h.db.videos.count()).toBe(0);
+    expect(await h.db.sync.count()).toBe(0);
+    expect(start).not.toHaveBeenCalled();
+    expect(h.fetcher.mock.calls.every(([url]) => new URL(url).pathname.endsWith('/channels'))).toBe(true);
   });
   it('enabled-gate disconnected start is auth-required without provider ingestion', async () => {
     const h = await setup({ connected: false, gate: true });
@@ -271,7 +283,7 @@ describe('Runtime local data/auth and failure truth (AC-AUTH-001/002/003/007/009
 
 describe('Runtime active sync/recovery (AC-SYNC-003/004/007/008/012)', () => {
   it('acknowledges before held bootstrap within 1 second; duplicate clients share durable truth', async () => {
-    const h = await setup({ gate: true, seed: true });
+    const h = await setup({ gate: PRODUCTION_PROVIDER_VALIDATION_APPROVED, seed: true });
     const bootstrap = held<Response>(); const page = held<Response>();
     h.fetcher.mockReturnValueOnce(bootstrap.promise).mockReturnValueOnce(page.promise)
       .mockResolvedValueOnce(json(videosPage())).mockResolvedValueOnce(json(channelResponse()));
@@ -300,7 +312,7 @@ describe('Runtime active sync/recovery (AC-SYNC-003/004/007/008/012)', () => {
     expect(h.fetcher.mock.calls.filter(([url]) => new URL(url).pathname.endsWith('/playlistItems'))).toHaveLength(1);
   });
   it('later ordinary network failure and previous success stay simultaneously visible', async () => {
-    const h = await setup({ seed: true, gate: true });
+    const h = await setup({ seed: true, gate: PRODUCTION_PROVIDER_VALIDATION_APPROVED });
     h.fetcher.mockResolvedValueOnce(json()).mockRejectedValue(new TypeError('network'));
     expect(await h.client().request('SYNC_START')).toMatchObject({ ok: true });
     await vi.waitFor(async () => expect((await h.repository.readSnapshot(NOW)).sync?.currentAttempt?.state).toBe('failure'));

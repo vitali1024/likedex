@@ -7,11 +7,11 @@ import { LikedexDatabase } from '../storage/database';
 import { LibraryRepository } from '../storage/repository';
 import { SynchronizationService } from '../sync/service';
 import { RuntimeCoordinator } from './coordinator';
+import { PRODUCTION_PROVIDER_VALIDATION_APPROVED } from './production-gate';
 
-// Deliberate production constant. No environment/config/message/UI override.
-// Enabling this requires live evidence, human approval and a reviewed change.
-export const PRODUCTION_PROVIDER_VALIDATION_APPROVED = false;
-export function startBackgroundRuntime(diagnosticsEnabled = false): RuntimeCoordinator {
+// Build composition only: the separate observation tool can close Sync,
+// but cannot grant approval. Production entrypoints use the committed gate.
+export function startBackgroundRuntime(diagnosticsEnabled = false, disableSync = false): RuntimeCoordinator {
   z.config({ jitless: true }); // MV3 CSP: use interpreted validation, no runtime code generation.
   const repository = new LibraryRepository(new LikedexDatabase(), (control) => {
     void browser.runtime.sendMessage({ protocolVersion: 1, event: 'STATE_REVISION', revision: control.revision,
@@ -23,7 +23,7 @@ export function startBackgroundRuntime(diagnosticsEnabled = false): RuntimeCoord
     auth.acceptSyncAuthorization(receipt); coordinator.authorizationValidated(receipt.scope);
   });
   const coordinator = new RuntimeCoordinator(repository, auth, sync, browser.runtime.id,
-    { providerValidationApproved: PRODUCTION_PROVIDER_VALIDATION_APPROVED, diagnosticsEnabled });
+    { providerValidationApproved: disableSync ? false : PRODUCTION_PROVIDER_VALIDATION_APPROVED, diagnosticsEnabled });
   // Register synchronously; Chrome can deliver messages before startup finishes.
   browser.runtime.onMessage.addListener((message: unknown, sender, respond) => {
     void coordinator.handle(message, sender).then(respond);

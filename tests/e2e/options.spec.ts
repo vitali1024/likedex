@@ -10,7 +10,7 @@ let context: BrowserContext;
 let origin: string;
 const pageErrors: string[] = [];
 test.beforeAll(async () => {
-  // Start from the real closed-gate extension and overwrite ONLY its Options
+  // Start from the real approved-gate extension and overwrite ONLY its Options
   // entry with an explicitly identified test adapter. Never build into production.
   await cp(resolve('.output/chrome-mv3'), path, { recursive: true });
   const manifest = JSON.parse(await readFile(resolve(path, 'manifest.json'), 'utf8'));
@@ -55,10 +55,11 @@ test('first run requires privacy agreement and explicit Connect; pending, denial
   await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
   await expect(page.getByText('Connected, never synced.', { exact: false })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((c) => c === 'AUTH_CONNECT').length)).toBe(2);
+  expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls)).not.toContain('SYNC_START');
   await page.close();
 });
 
-test('local search/filter/sort/page/selection and canonical links; closed production gate preserves library', async () => {
+test('local search/filter/sort/page/selection and canonical links; production auth precondition preserves library', async () => {
   const page = await open();
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   const rows = page.locator('.video-row');
@@ -91,9 +92,11 @@ test('local search/filter/sort/page/selection and canonical links; closed produc
   await expect(page.getByLabel('Search library')).toHaveValue('video');
   await page.getByLabel('Search library').fill('');
   expect(await page.evaluate(() => [...(window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls])).toEqual(beforeLocalInteraction);
+  expect(beforeLocalInteraction).not.toContain('SYNC_START'); // Mount/local actions never sync.
   await page.getByRole('button', { name: 'Sync', exact: true }).click();
-  await expect(page.getByText('Synchronization is temporarily unavailable', { exact: false })).toBeVisible();
-  await expect(page.getByText('No sync was started.', { exact: false })).toBeVisible(); await expect(rows).toHaveCount(50);
+  await expect(page.getByText('YouTube authorization is required. Connect YouTube to continue.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Synchronization is temporarily unavailable', { exact: false })).toHaveCount(0);
+  await expect(rows).toHaveCount(50);
   await expect(page.getByText('Last successful sync:', { exact: false })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((c) => c === 'SYNC_START').length)).toBe(1);
   expect(errors).toEqual([]); await page.close();

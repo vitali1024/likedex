@@ -4,6 +4,11 @@ import { createHash } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { PRODUCTION_PROVIDER_VALIDATION_APPROVED } from '../src/runtime/production-gate.ts';
+
+// Import the release decision directly; no source-text/minifier parsing.
+// Production Chromium smoke independently checks the emitted runtime wiring.
+assert.equal(PRODUCTION_PROVIDER_VALIDATION_APPROVED, true, 'Production provider validation must be approved');
 
 const output = '.output/chrome-mv3';
 const manifest = JSON.parse(await readFile(join(output, 'manifest.json'), 'utf8'));
@@ -67,4 +72,4 @@ async function inspect(directory) {
 }
 
 await inspect(output);
-console.log('OAuth/Store identity, manifest, entrypoints, icons, and production artifact checks passed.');
+console.log('Approved production Sync gate, OAuth/Store identity, manifest, entrypoints, icons, and production artifact checks passed.');

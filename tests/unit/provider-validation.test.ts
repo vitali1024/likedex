@@ -4,7 +4,6 @@ import { ChromeIdentityAdapter } from '@/src/auth/chrome-identity';
 import { GoogleAuthorizationRequests, type FetchBoundary } from '@/src/auth/google-requests';
 import { LikedexDatabase } from '@/src/storage/database';
 import { LibraryRepository } from '@/src/storage/repository';
-import { PRODUCTION_PROVIDER_VALIDATION_APPROVED } from '@/src/runtime/background';
 import { YouTubeLikedVideosProvider, isTrustedProviderCompletion } from '@/src/provider/youtube-ingestion';
 import { observeProvider } from '@/tools/provider-validation/service';
 import { validationSenderAllowed } from '@/tools/provider-validation/background';
@@ -346,8 +345,7 @@ describe('Human release observation is non-destructive', () => {
     expect(result).toMatchObject({ status: 'failed', error: { category: 'internal' } });
     expect(JSON.stringify(result)).not.toContain(TOKEN_A);
   });
-  it('production approval remains false and release protocol accepts no bypass parameters', () => {
-    expect(PRODUCTION_PROVIDER_VALIDATION_APPROVED).toBe(false);
+  it('release protocol accepts no bypass parameters', () => {
     expect(startSchema.safeParse({ operation: 'OBSERVE_PROVIDER', providerValidationApproved: true }).success).toBe(false);
     const id = 'mmefiakgfhddiojfdnkfpfpbkgbfgkgj';
     expect(validationSenderAllowed({ id, url: `chrome-extension://${id}/provider-validation.html` }, id)).toBe(true);

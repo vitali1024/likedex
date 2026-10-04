@@ -42,6 +42,12 @@ Live validation exposed actual compatibility defects and led to corrections: nat
 
 Human decision: “The successful live observation is accepted as satisfying the committed provider-validation prerequisite for production synchronization enablement.” **Live provider validation: COMPLETE / APPROVED. Production Sync gate: STILL CLOSED. First real synchronization smoke: NOT YET PERFORMED.** Approval authorizes a separate gate-enablement change; it does not itself enable Sync. No implementation, Phase 8 work, staging or commit is included. Link the eventual human evidence commit after it exists; later enabled-composition verification, real synchronization smoke, independent review and final package evidence remain separate obligations.
 
+## Authorized production Sync gate enablement — 2026-10-04
+
+Following committed live-provider approval at `04c01dd`, the human authorized a small production release-gate transition. `src/runtime/production-gate.ts` now exports literal `PRODUCTION_PROVIDER_VALIDATION_APPROVED = true`; real background composition uses it and the build check imports/asserts it directly. The separate observation build explicitly disables Sync, preserving non-destructive observation. Runtime tests retain closed/missing/malformed rejection and use the approved production constant for explicit start, duplicate joining, success and ordinary failure. Production Chromium smoke checks the emitted runtime reaches normal authentication preconditions. Provider/auth/storage/reconciliation code and safety tests are unchanged; no automatic sync, Options redesign or Phase 8 work is included.
+
+**Live validation COMPLETE / APPROVED; production gate ENABLED; first real sync smoke STILL PENDING.** Actual enabled-composition maker results and human smoke instructions are in the [release record](../release/live-provider-validation.md). This task performs no real-account sync, independent review, staging or commit; link the eventual human commit once it exists. No new loop history or checker verdict is claimed.
+
 ## Final submission and demo
 
 Final Capstone PR should link the five practices in the table, product/engineering definition of done, actual CI/checker state, release package identity, Store submission receipt and OAuth readiness/status. Clearly label external reviews pending; a submission receipt is not approval. No generic autonomy-log, dynamic-context, framework or factory practice claim is planned.

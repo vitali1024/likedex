@@ -48,13 +48,13 @@ function ObservationPage() {
     connection.postMessage({ operation: 'OBSERVE_PROVIDER' });
   };
   return <main className="options-app"><h1>DEVELOPMENT / RELEASE VALIDATION ONLY</h1>
-    <p>This observes real YouTube bootstrap, membership pagination and metadata through the existing provider. It does not create a mirror, save a sync attempt, reconcile or prune. Production Sync remains closed.</p>
+    <p>This observes real YouTube bootstrap, membership pagination and metadata through the existing provider. It does not create a mirror, save a sync attempt, reconcile or prune. Sync remains closed in this observation build.</p>
     <p><a href="options.html">Return to Options</a> and explicitly Connect before observing. Close other Likedex pages during observation. Keep this page open; closing it cancels the run. Worker interruption is failure, not success.</p>
     <p>Only aggregate counts and sanitized structural failure facts are shown, temporarily for ten minutes after the last update. No identifiers, titles, timestamps, response bodies, tokens or page tokens are exported. Counts describe API-visible membership, not a guarantee of uncapped lifetime completeness.</p>
     <button disabled={running} onClick={begin}>Observe provider without syncing</button>
     {running && <button onClick={() => port.current?.disconnect()}>Cancel observation</button>}
     <p role="status">{running ? 'Observing; no trusted completion yet…' : result?.status === 'success'
-      ? 'Observation succeeded with genuine trusted provider completion. Human review/approval is still pending; Sync remains closed.'
+      ? 'Observation succeeded with genuine trusted provider completion. This result does not change release approval; Sync remains closed in this observation build.'
       : result?.status === 'failed' ? `Observation failed: ${result.error.category} / ${result.error.messageKey}. No success established.` : 'Ready for explicit observation.'}</p>
     {error && <p role="alert">{error}</p>}
     {summary && <><h2>Sanitized evidence</h2><p>Counts are unique memberships except rawMemberships, duplicateVideoItems and page counts. hydrated means lookup returned an entry; withoutRichMetadata means title, channel name or duration is missing. Unknown or unavailable metadata still counts as membership. For duplicates, hydration counts describe the last observation per video.</p>

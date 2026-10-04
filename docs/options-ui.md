@@ -2,7 +2,7 @@
 
 Maker implementation on clean committed Phase 6 baseline `826f546`. Options uses real Phase 6 runtime messaging; this document does not record human UX approval, independent review, live OAuth/provider success, or release acceptance. Work is left unstaged/uncommitted for human review. Phase 8 has not begun.
 
-Subsequent release evidence, **2026-10-04**: [live provider validation COMPLETE / APPROVED](release/live-provider-validation.md); **production Sync gate STILL CLOSED; first real synchronization smoke NOT YET PERFORMED**. The human accepted the successful non-destructive observation as satisfying the provider-validation prerequisite and authorized a separate gate-enablement change. The Phase 7 maker record below, including its pending/untouched live-checklist statements, is historical; approval does not itself enable Sync or begin Phase 8.
+Subsequent release evidence, **2026-10-04**: [live provider validation COMPLETE / APPROVED](release/live-provider-validation.md); **production Sync gate ENABLED; first real synchronization smoke STILL PENDING**. The human accepted the successful non-destructive observation as satisfying the provider-validation prerequisite and separately authorized the gate transition. Existing Options code already renders active/successful sync; no Options implementation or layout change was needed. The Phase 7 maker record below, including its pending/untouched live-checklist statements, is historical. No Phase 8 work is included.
 
 ## Files changed
 
@@ -54,7 +54,7 @@ A bundled, accessible build-specific privacy notice is linked persistently from 
 
 Wide Options uses list plus persistent selected detail. Detail includes full title, channel, known liked/publication dates and duration, known description, observed availability disclaimer, direct YouTube link and Copy link. Missing values remain explicitly unknown. Links require canonical 11-character video IDs and use `https://www.youtube.com/watch?v=…`. Clipboard success is announced only after `writeText` resolves; rejection remains visible. No extra clipboard/tabs permission is used.
 
-Sync invokes only `SYNC_START`; no provider or sync service is imported into the UI. A successful start acknowledgement is runtime truth, followed by independent snapshot observation. Lost replies are resolved by fresh observation without automatic mutation replay. The closed production gate returns **provider-validation-required**: the UI says synchronization is temporarily unavailable during provider validation and that no sync started. It does not set active state or disable Sync permanently. Later deliberate gate enablement requires no UI redesign.
+Sync invokes only explicit user `SYNC_START`; no provider or sync service is imported into the UI. A successful start acknowledgement is runtime truth, followed by independent snapshot observation. Lost replies are resolved by fresh observation without automatic mutation replay. The approved production gate now reaches existing auth/sync preconditions and start behavior. Disabled/missing/malformed gates still return **provider-validation-required** and display that no sync started. The gate transition requires no Options code or layout change; existing active/success presentation remains authoritative.
 
 The UI renders preparing/checking, scanning, applying, finalizing, success, partial, interrupted and failure from durable attempt state. Accepted page/unique membership counts are shown without a completion percentage. Last successful sync remains separate and visible after a later ordinary failed attempt while eligible. Revision provenance can label a partially updated mirror even across successive attempts. Cleanup uses its actual data-free reason, never a claim that remote likes changed.
 
@@ -68,7 +68,7 @@ At 760px and below, selecting a row reveals focused detail with Back. Back prese
 
 ## Tests and acceptance traceability
 
-No dependency was added. Vitest handles pure queries and static React presentation. Playwright builds `tests/options-harness/` with WXT’s already pinned Vite dependency into **`.output/options-test-composition`**, copies the real closed background, and identifies the copied manifest as a test composition. The injected runtime transport lives exclusively under tests. Its Sync request reaches the actual closed production background; there is no enabled test gate in this browser UI composition. Production build/lint restrictions remain intact.
+No dependency was added. Vitest handles pure queries and static React presentation. Playwright builds `tests/options-harness/` with WXT’s already pinned Vite dependency into **`.output/options-test-composition`**, copies the real approved background, and identifies the copied manifest as a test composition. The injected runtime transport lives exclusively under tests. Its Sync request reaches the actual production background, whose real storage remains disconnected despite Options-only fixture identity; the ordinary auth failure preserves the fixture view. No test gate/fixture provider is injected into that background. Production build/lint restrictions remain intact.
 
 | Acceptance | Phase 7 evidence | Limits |
 |---|---|---|
@@ -80,7 +80,7 @@ No dependency was added. Vitest handles pure queries and static React presentati
 | AC-LIBRARY-008/009 | Validated canonical href, exact copied URL, clipboard rejection, intentional unknowns/decorative thumbnail fallback | Actual user-opened playback/real clipboard and offline thumbnail smoke remain manual |
 | AC-LIBRARY-010 | Deterministic 3,000-record query; 20 warmed runs, P95 under 200ms; bounded rendered page | Local benchmark, no universal-device performance claim |
 | AC-OPTIONS-001/002 | Wide persistent detail and narrow focused detail/Back, unclipped controls | Settings portion of AC-OPTIONS-001 excluded in Phase 7 |
-| AC-SYNC-005/007/011/013 | Every durable state presentation; active polling/idle no-poll; prior success plus later failure; snapshot failure and actual closed-gate UX | Gate not enabled; no production running-sync success |
+| AC-SYNC-005/007/011/013 | Every durable state presentation; active polling/idle no-poll; prior success plus later failure; snapshot failure and actual approved production auth precondition after explicit click | First real production sync smoke pending |
 | AC-DATA-014 | Missed notification/expired cached view, action deadline gate, focus/visibility integration | Export/complete data-control UI remain Phase 9 |
 | AC-A11Y-001/003/004 | Semantic labeled controls, slash/Tab/native activation, detail focus/Back, copy/status/error messages, responsive/reduced-motion browser paths | Side Panel/Settings/dialog portions and manual screen-reader/zoom audit pending |
 | AC-VERIFY-001/003 | Full authoritative maker verification; separately identified fixture composition; inspected production bundle | No independent review/release/package approval |

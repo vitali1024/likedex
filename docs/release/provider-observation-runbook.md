@@ -1,6 +1,6 @@
 # Non-destructive human provider observation
 
-This is an invocation runbook; actual evidence and approval are in the [completed live-validation record](live-provider-validation.md). **Live provider validation: COMPLETE / APPROVED. Production Sync gate: STILL CLOSED. First real synchronization smoke: NOT YET PERFORMED.** No Phase 8 work is included. The procedure remains available for later explicitly authorized observations; the earlier required retry has succeeded.
+This is an invocation runbook; actual evidence and approval are in the [completed live-validation record](live-provider-validation.md). **Live provider validation: COMPLETE / APPROVED. Production Sync gate: ENABLED. First real synchronization smoke: STILL PENDING.** The dedicated observation build still explicitly disables Sync through build composition and preserves every non-mutation guarantee; its `productionSyncGate: closed` report describes that loaded build. No Phase 8 work is included. The procedure remains available for later explicitly authorized observations; the earlier required retry has succeeded.
 
 ## Architecture and boundaries
 
@@ -16,9 +16,9 @@ The output is aggregate-only: bootstrap validation, accepted page count, raw/uni
 
 ## Exact human steps
 
-Completed retry: the human reported success over 71 pages and 3,547 unique memberships, with validated bootstrap and trusted completion. Page 71 contained 47 items, retained resultsPerPage 50, had no continuation and hydrated 47/47. See the [completed record and human approval](live-provider-validation.md) and [terminal compatibility correction](provider-pagination-diagnosis.md). Continuing-page equality and the earlier page-eight privacy correction remain enforced. Production Sync remains closed; approval authorizes a separate enablement change.
+Completed retry: the human reported success over 71 pages and 3,547 unique memberships, with validated bootstrap and trusted completion. Page 71 contained 47 items, retained resultsPerPage 50, had no continuation and hydrated 47/47. See the [completed record and human approval](live-provider-validation.md) and [terminal compatibility correction](provider-pagination-diagnosis.md). Continuing-page equality and the earlier page-eight privacy correction remain enforced. Approval preceded the separate production gate enablement; this observation build remains closed.
 
-The earlier seven-page / 350-of-3,547 failure is preserved in the [pagination diagnosis](provider-pagination-diagnosis.md). The release observation adds sanitized final `enumerationDiagnostic` evidence, including rejected membership envelopes; ordinary production Sync remains closed. Earlier retry instructions and build hashes are historical and do not identify the successful observation build.
+The earlier seven-page / 350-of-3,547 failure is preserved in the [pagination diagnosis](provider-pagination-diagnosis.md). The release observation adds sanitized final `enumerationDiagnostic` evidence, including rejected membership envelopes. Earlier retry instructions and build hashes are historical and do not identify the successful observation build.
 
 Subsequent live reports proved an otherwise valid page-eight membership failed only because its string privacyStatus was unfamiliar. The earlier [privacy compatibility diagnosis](membership-item-diagnosis.md) records that correction. The corrected membership contract tolerates unfamiliar strings as unknown metadata and preserves all identity/type/completion gates. Final JSON retains `enumerationDiagnostic.invalidItems` for actual rejected shapes, with only ordinals, allowlisted reasons and boolean checks. Unfamiliar strings alone no longer create invalidItems; no raw values are exported. The successful live report contains an empty terminal invalidItems list and internalStop none.
 

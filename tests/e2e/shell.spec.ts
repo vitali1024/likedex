@@ -5,7 +5,7 @@ import type { browser } from 'wxt/browser';
 import { requestSchema, responseSchema, resultSchemas, type RuntimeOperation } from '@/src/runtime/contracts';
 import { attempt, NEXT_ATTEMPT_ID, OBSERVED, owner, success, video } from '../fixtures/storage';
 
-test('Production extension loads shells, typed runtime, closed gate and restarted worker', async () => {
+test('Production extension loads shells, typed runtime, approved gate and restarted worker', async () => {
   const extensionPath = resolve('.output/chrome-mv3');
   const context = await chromium.launchPersistentContext('', {
     channel: 'chromium',
@@ -52,7 +52,7 @@ test('Production extension loads shells, typed runtime, closed gate and restarte
     expect(await send('AUTH_STATUS_GET')).toMatchObject({ ok: true, result: { status: 'auth-required' } });
     expect(await send('LIBRARY_SNAPSHOT_GET')).toMatchObject({ ok: true, result: { videos: [], owner: null, sync: null } });
     const before = await send('SYNC_STATUS_GET');
-    expect(await send('SYNC_START')).toMatchObject({ ok: false, error: { code: 'provider-validation-required' } });
+    expect(await send('SYNC_START')).toMatchObject({ ok: false, error: { code: 'auth-error', detail: { category: 'authentication' } } });
     const after = await send('SYNC_STATUS_GET');
     if (!before.ok || !after.ok) throw new Error('Runtime status unavailable');
     expect(after.result).toEqual(before.result);
@@ -75,7 +75,7 @@ test('Production extension loads shells, typed runtime, closed gate and restarte
     await expect.poll(() => runningStatus).toBe('stopped');
     expect(await send('AUTH_STATUS_GET')).toMatchObject({ ok: true, result: { status: 'auth-required' } });
     await expect.poll(() => runningStatus).toBe('running');
-    expect(await send('SYNC_START')).toMatchObject({ ok: false, error: { code: 'provider-validation-required' } });
+    expect(await send('SYNC_START')).toMatchObject({ ok: false, error: { code: 'auth-error', detail: { category: 'authentication' } } });
 
     // Test-only synthetic persisted truth in the real browser IndexedDB. The
     // production bundle has no fixture path or provider enablement switch.
@@ -99,8 +99,10 @@ test('Production extension loads shells, typed runtime, closed gate and restarte
     }, seed);
     await cdp.send('ServiceWorker.stopWorker', { versionId: versionId! });
     await expect.poll(() => runningStatus).toBe('stopped');
-    // This wakes startup without requesting authorization or invoking sync.
-    expect(await send('SYNC_START')).toMatchObject({ ok: false, error: { code: 'provider-validation-required' } });
+    // Invalid messaging wakes startup without requesting authorization or sync.
+    expect(responseSchema.parse(await page.evaluate(() =>
+      (globalThis as unknown as { chrome: typeof browser }).chrome.runtime.sendMessage({ operation: 'PRUNE' }))))
+      .toMatchObject({ ok: false, error: { code: 'invalid-request' } });
     const readSync = () => page.evaluate(async () => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const open = indexedDB.open('likedex'); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error);

@@ -1,5 +1,6 @@
 // Explicit separately built browser component composition. Never imported by
-// entrypoints/ or src/. SYNC_START still reaches the actual closed background.
+// entrypoints/ or src/. SYNC_START reaches the actual production background;
+// its real storage is disconnected despite the Options-only fixture identity.
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
 import { OptionsApp } from '../../src/options/OptionsApp';

@@ -9,6 +9,6 @@ export default defineConfig({
   manifest: {
     ...production.manifest,
     name: 'Likedex — RELEASE VALIDATION ONLY',
-    description: 'Human provider observation only. Not a Store release package. Production sync remains blocked.',
+    description: 'Human provider observation only. Not a Store release package. Sync remains blocked in this build.',
   },
 });

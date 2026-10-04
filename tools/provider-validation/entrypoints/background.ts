@@ -4,7 +4,7 @@ import { startBackgroundRuntime } from '../../../src/runtime/background';
 import { registerProviderObservation } from '../background';
 
 export default defineBackground(() => {
-  startBackgroundRuntime(true); // Safe diagnostics only; production sync gate still false.
+  startBackgroundRuntime(true, true); // Safe diagnostics; this observation build keeps Sync closed.
   registerProviderObservation();
   void browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 });
