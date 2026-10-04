@@ -1,116 +1,84 @@
-# Page-eight membership validation diagnosis
+# Page-eight playlist-item privacy compatibility correction
 
-Inspection date: 2026-10-04. Baseline was clean `eb7567a254b29bfdf1e33f65b583f271a9fc5696` (`chore: expose sanitized provider pagination diagnostics`). This is a focused diagnosis and diagnostic patch, not a policy amendment, live agent-run test, independent release review or production approval. No commit/staging, Phase 8 work, Sync enablement or pruning was performed.
+Inspection date: 2026-10-04. Clean source baseline: `1b8b6e5` (`chore: expose membership validation diagnostics`). The human request authorizes this narrow provider-contract correction despite historical specifications-only wording in AGENTS.md. No staging/commit, Phase 8 work, production Sync enablement or pruning is authorized or performed. This is maker verification, not independent release review.
 
-## Proven branch and remaining uncertainty
+## Proven live failure
 
-The human's latest real observation reports seven accepted/hydrated pages and 350 memberships, followed by a decoded eighth envelope containing 50 items, stable total 3,547, a fresh continuation and no internal stop. Its reason is `membership-item-invalid`; observed envelope count is 400 and eighth-page hydration counts are null. The excerpt omits some full-result fields and original observation time/Chrome version/build hashes; do not invent those missing details.
+The earlier human-run observations reached seven accepted/hydrated pages (350 memberships against total 3,547), then a decoded eighth page of 50 items with stable total, fresh continuation, observed envelope count 400 and no internal stop. Structural diagnostics subsequently proved the rejected membership had:
 
-In baseline `validateMembershipPage`, only `playlistItem.safeParse(raw)` failure throws an unmappable-membership error with the default `membership-item-invalid` reason. `ProviderError` supplies that default and maps the error to `untrusted-enumeration / enumeration-untrusted / scanning`. The page-count gate precedes item validation. The generator has not reached hydration or its later token/total/source checks. The fresh-token evidence is an internal comparison against the preceding token set, not proof of terminal completeness.
+- Valid playlist-item kind and source ID, expected playlist association and video-resource kind.
+- Valid snippet and contentDetails video IDs that agree.
+- Valid liked timestamp and position; status container and privacyStatus present.
+- Only `privacyStatusRecognized: false`, with reason `membership-privacy-status-invalid`.
 
-**The specific rejected field and item ordinal are not proven.** The report establishes a schema violation on page eight. It does not identify a deleted/private video, demonstrate a provider cap, or prove an over-strict requirement is the cause.
+The human explicitly confirms the unfamiliar value was a **string**. This establishes trustworthy membership identity and an over-strict local privacy enum. It does not identify the video as private/deleted or establish full live completion. No raw privacy value is required or recorded. Actual observation time, Chrome version and original build hashes were not supplied; no missing context is invented.
 
-## Every schema branch behind the original generic reason
+## Narrow contract correction
 
-The item schema is unchanged by this patch. Absent means missing/undefined; explicit null counts as present and can fail its type check. Every nested required object must be an object, not null, array or scalar.
+The official [playlist-item resource properties](https://developers.google.com/youtube/v3/docs/playlistItems#properties), checked 2026-10-04, describe `status.privacyStatus` as a string and do not document a closed playlist-item-specific enum. Likedex incorrectly treated public/unlisted/private as exhaustive for playlist membership.
 
-| Validated field | Exact rejection condition | New structural reason(s) |
-|---|---|---|
-| Item itself | Not an object, including null/array/scalar | membership-item-not-object |
-| `kind` | Missing, wrong type or not youtube#playlistItem | membership-kind-invalid |
-| `id` | Missing; or not a nonempty string matching `[A-Za-z0-9_-]+` | membership-playlist-item-id-missing / invalid |
-| `snippet` | Missing; or not an object | membership-snippet-missing / invalid |
-| `snippet.playlistId` | Missing; or invalid nonempty identifier type/characters | membership-playlist-id-missing / invalid |
-| `snippet.resourceId` | Missing; or not an object | membership-resource-id-missing / invalid |
-| `snippet.resourceId.kind` | Missing, wrong type or not youtube#video | membership-resource-kind-invalid |
-| `snippet.resourceId.videoId` | **If supplied:** not a string of exactly 11 allowed identifier characters | membership-snippet-video-id-invalid |
-| `snippet.publishedAt` | **If supplied:** not a string, including null/numeric/object values | membership-liked-at-type-invalid |
-| `snippet.position` | **If supplied:** not a finite, nonnegative safe integer (fractional, negative, wrong type or too large) | membership-position-invalid |
-| `contentDetails` | Missing; or not an object | membership-content-details-missing / invalid |
-| `contentDetails.videoId` | **If supplied:** invalid 11-character video ID | membership-content-video-id-invalid |
-| `status` | Missing; or not an object | membership-status-missing / invalid |
-| `status.privacyStatus` | **If supplied:** not public, unlisted or private, including wrong type/null | membership-privacy-status-invalid |
+Only playlist-item `status.privacyStatus` changes from `privacy.optional()` (the local three-value enum) to `z.string().optional()`. Recognized strings retain existing behavior. Unfamiliar strings are unknown metadata and do not invalidate membership or enumeration solely for that reason. Missing privacy leaf remains permitted. Required status container and all other schema/identity rules remain intact. The separate `videos.list` privacy/upload-status schemas remain unchanged.
 
-There are no other item-level refinements. Unknown extra fields are stripped, not validated. `etag`, playlist title/description/channel/thumbnail fields, `contentDetails.videoPublishedAt`, start/end/note and other extra fields cannot cause this schema failure. Missing optional leaf fields pass. An unusable **string** liked timestamp passes schema validation and maps to null; missing dates do too. Date parsing is not a membership trust gate.
+The exact mapping remains the existing `{ sourceId, videoId, likedAt, position }` membership representation: playlist-item privacy is discarded, recognized or unfamiliar. No domain field or raw provider string is introduced. Unknown playlist privacy provides no known availability evidence. Existing availability mapping reads only hydrated video status: processed public/unlisted is available; explicit private/deleted/rejected is unavailable; absent usable evidence is unknown, and lookup omission is `unknown / lookup-omitted`. An unfamiliar playlist string cannot override stronger hydration evidence or force resolved availability to unknown.
 
-Three post-schema identity branches have different existing reasons and cannot, by themselves, explain the original generic reason: syntactically valid wrong playlist ID (`membership-playlist-conflict`), both membership video IDs absent (`membership-video-id-missing`), and both valid video IDs disagreeing (`membership-video-id-conflict`). Duplicate source IDs are rejected later in ingestion under `membership-source-duplicate`. These distinctions remain intact.
+## Preserved rejection and completion gates
 
-## A/B/C field audit
+These remain failures: wrong playlist ID; missing usable video ID; supplied IDs disagree; invalid supplied ID; non-video resource; missing/malformed source ID or item kind; missing/null/scalar/array snippet, contentDetails or status container; malformed supplied date/position types; and numeric/object/null/array/boolean privacyStatus. Unknown **strings** are the precise newly accepted case. An unusable date string remains the previously permitted null date.
 
-A = membership identity/type evidence; B = playlist ownership/chain evidence; C = optional metadata that can be unknown. This classification distinguishes intrinsic identity needs from current committed structural requirements; it does not change either.
+Duplicate source IDs, token repeats/cycles/empty continuation, malformed envelopes, count discrepancies, transport/hydration failures, owner/attempt/generation/auth-epoch checks and cancellation/time/retry limits remain unchanged. No arbitrary page/item cap is added or raised. `TrustedProviderCompletion` still requires the entire validated terminal chain, reconciled counts and genuine in-process provenance. Production finalizer/pruning gates are unchanged.
 
-| Field | Class / intrinsic purpose | Current committed treatment |
-|---|---|---|
-| Item object and `kind` | A: correct membership resource | Required |
-| `id` | A: source identity and duplicate-source detection | Required valid identifier |
-| `snippet` | B: container for playlist association (also carries A fields) | Required object |
-| `snippet.playlistId` | B: membership belongs to the bootstrapped Likes playlist | Required valid matching ID |
-| `snippet.resourceId`, `.kind` | A: identify a video resource | Required object and video kind |
-| `snippet.resourceId.videoId` | A: one authoritative video-ID alternative | May be absent if contentDetails supplies a valid ID |
-| `contentDetails`, `.videoId` | A: second authoritative ID source | Container required by committed structure; leaf may be absent if snippet supplies a valid ID |
-| `snippet.publishedAt` | C: liked-time provenance | Absent/unusable strings become unknown; wrong types fail |
-| `snippet.position` | C: optional position, not used as a completeness or sort proof | Absent becomes unknown; invalid supplied numeric/type value fails |
-| `status`, `.privacyStatus` | C: item privacy metadata, not identity or video availability authority | Container required by committed structure; leaf optional but validated if supplied |
+## Sanitized diagnostics
 
-Membership trust intrinsically needs source identity, association with the expected playlist, a video resource and at least one valid authoritative video ID; simultaneous IDs must agree. Owner/session/token/count/source uniqueness and full-chain completion remain separate gates. A missing rich title/channel/thumbnail/date is not evidence of missing membership or unavailability.
+Unfamiliar strings alone no longer enter `enumerationDiagnostic.invalidItems`. Existing boolean `privacyStatusRecognized: false` remains useful on an item rejected for another reason, without making privacy an additional rejection reason. Its source-code comment now clarifies that recognition is a metadata fact. No new aggregate/DTO/UI machinery was needed. Malformed privacy types still use `membership-privacy-status-invalid`.
 
-The current schema is conservative about required containers and supplied optional types. Requiring `status` or `contentDetails` when a usable video ID exists elsewhere may warrant a future policy discussion **if live structural evidence establishes that omission**. It is not a proven implementation bug here: the committed [provider contract](../provider-ingestion.md#runtime-validation-and-mapping) explicitly requires snippet/contentDetails/status containers, validates identifier characters, and says invalid field types fail. Missing metadata is already handled where that contract permits it. No field was relaxed or newly made mandatory.
+Tests verify the synthetic unfamiliar string is absent from mapped records, completion/page events and final release JSON. Diagnostics persist no raw value or provider identifiers. Observation still performs only read-only precondition checks and in-memory aggregation, with equality of every seeded local store and no claim/apply/finalizer/cleanup calls.
 
-## Official API contract review
+## Deterministic regressions and verification
 
-The official [list method](https://developers.google.com/youtube/v3/docs/playlistItems/list) describes GET enumeration, requested parts and token pagination. Likedex requests id, snippet, contentDetails and status, without a fields projection. Its documentation says selecting a part includes its child properties; it does not separately describe every unavailable/legacy item shape.
+The synthetic generated fixture puts `synthetic-unrecognized-privacy` at page 8, item 17 (membership 367), with otherwise valid identity/date/position. It never uses the private live value.
 
-The official [resource reference](https://developers.google.com/youtube/v3/docs/playlistItems#properties) describes `id` as a unique playlist-item string; video resource kind and video-ID fields; contentDetails for video items; publishedAt as playlist-addition datetime; and privacyStatus as item privacy. It expressly associates snippet.videoId presence with video kind. It does not specify Likedex's source-ID regex or promise every requested container/metadata property for every unavailable/legacy entry. The resource representation is not observed page-eight data. **Inference:** these docs do not prove which live field failed or justify changing the committed gate. No community report, placeholder title or localized text was used as destructive trust evidence.
+- A focused 450-item / nine-page test accepts and preserves that membership, hydrates its ID, yields page eight, follows the exact continuation to page nine and produces genuine completion with matching counts.
+- The high-value 3,547-item / 71-page provider regression verifies every membership/hydration request, opaque token, 50-ID batch (47 on the last page), page-eight identity/public hydration, 142 ingestion requests, count reconciliation and terminal-only genuine completion with all 3,547 IDs.
+- The release observation regression covers the same unfamiliar page-eight string, all 71 pages, 143 requests including bootstrap, matching counts, empty invalidItems, no raw-string export and zero local-store mutation.
+- Availability tests cover trusted public/private hydration, absent status evidence and lookup omission. The existing recognized-state mappings are preserved. Unknown video-resource privacy still fails its unchanged metadata schema.
+- Both suites preserve identity failures and now cover five malformed privacy types. A page-eight multi-error case keeps false recognition as a sanitized fact but rejects only its actual date/position and identity/container violations.
 
-## Diagnostic implementation and privacy
+Toolchain: Node 24.19.0 / npm 11.17.0. No live account was accessed by this task; successful full live validation and independent release review remain outstanding.
 
-The release-only observation now includes `enumerationDiagnostic.invalidItems`, at most 50 entries for the rejected membership page. Each entry carries one-based page/item ordinals, deduplicated allowlisted `reasonCodes`, fixed boolean `fieldPresence` flags and nullable boolean checks: item/video kind, source/playlist/video ID syntax, video-ID agreement, expected-playlist match, date parsing, position validity and privacy-value recognition. Null means absent or not safely comparable; false means a supplied value fails the specified check. Actual timestamps and provider values are never returned.
-
-Schema issues are mapped through fixed code-owned paths; no Zod issue object, message, input value or arbitrary path is serialized. `membership-schema-invalid` is a reserved safe fallback for a future unmapped schema path, not a current reachable branch claimed as live evidence. The result's top-level reason is the first invalid item's first failure reason; the list preserves all schema reasons for every invalid item on that page. Post-schema identity failures are also recorded. If schema validation fails, logical identity checks are not promoted into extra rejection reasons, but the safe comparisons still provide structural evidence when possible.
-
-Production retains immediate failure with its broad error semantics and has no item observer. Release validation examines the remainder of the bounded page solely to collect structural evidence, then **always throws the first failure before returning any membership page or requesting hydration**. It cannot skip invalid membership, produce a completion capability, apply records or prune. Success results have an empty invalidItems list. No diagnostics are saved in extension storage; the existing temporary-view timer/resume expiry still applies.
-
-No video/source/playlist/channel ID, title, description, timestamp value, page token, OAuth token or raw response/item/exception is included. Strict DTOs reject extra fields and arbitrary reasons. No network destination, permission, source strategy, auth logic, storage policy or completion/pruning requirement changed.
-
-## Tests and verification
-
-New synthetic cases cover all 20 reachable schema subreasons and the three existing identity invariants, in both direct provider and observation suites. Each verifies no completion/hydration, safe diagnostics and production rejection. Known IDs, timestamp text, invalid private-value sentinels and OAuth tokens are excluded. Strict DTO tests reject injected ID fields and arbitrary reason values. The reserved future-path fallback is not fabricated as a provider observation.
-
-Representative accepted shapes cover snippet-only ID, content-only ID, both equal, absent videoPublishedAt/title/channel/thumbnail metadata, absent privacy leaf, absent liked date/position and unusable liked-date string. Existing unequal-ID, non-video-kind, missing source-ID and malformed-type safety assertions remain. These are synthetic boundary cases, not assertions about real unavailable videos.
-
-A generated eighth-page regression supplies 50 items after seven valid pages, with invalid items at ordinals 17, 35 and 50. It verifies all invalid entries and multiple reasons per item, accepted count 350 versus observed envelope count 400, stable 3,547 total, fresh token, null eighth hydration counts, no trusted completion and equality of every local store. A separate date case distinguishes an unusable string from a fatal wrong type without exposing the string. The original 3,547-item / 71-page success regression remains passing.
-
-The nine-test Chromium suite now checks actual serialized item diagnostics on the observation page, including missing contentDetails with snippet identity present and an unusable date string. It checks privacy sentinels, every local store, the closed production Sync result and evidence-view expiry. This synthetic case is not the live root cause.
-
-Observed toolchain: Node 24.19.0 / npm 11.17.0. All first focused/source checks passed; no correction iteration was required to make a failed safety test green.
-
-| Requested verification | Result |
+| Requested verification | Final result |
 |---|---|
-| Focused provider/validation | PASS: 213 tests |
-| npm run lint | PASS: no lint warnings |
-| npm run typecheck | PASS |
-| npm run test | PASS: 511 tests / 13 files |
-| npm run verify:sync | PASS: 255 tests / 5 files |
-| npm run build / npm run check:build | PASS |
-| npm run build:provider-validation / npm run check:provider-validation | PASS |
-| npm run test:e2e | PASS: nine Chromium tests |
-| npm run verify | PASS: exit 0, including all nine enhanced browser tests |
-| npm audit | PASS: zero vulnerabilities; no audit fix |
-| git diff --check | PASS |
+| Focused provider/validation | PASS: 227 tests / two files |
+| `npm run lint` | PASS: no lint warnings |
+| `npm run typecheck` | PASS |
+| `npm run test` | PASS: 525 tests / 13 files |
+| `npm run verify:sync` | PASS: 265 tests / five files |
+| `npm run build` | PASS |
+| `npm run check:build` | PASS |
+| `npm run build:provider-validation` | PASS |
+| `npm run check:provider-validation` | PASS |
+| `npm run test:e2e` | PASS: nine Chromium tests |
+| `npm run verify` | PASS: exit 0, including all nine browser tests |
+| `npm audit` | PASS: zero vulnerabilities; no audit fix |
+| `git diff --check` | PASS |
 
-Browser verification used permitted outside-sandbox execution for isolated Playwright profiles. Audit used the human's existing explicit approval to share public dependency names/versions with npm's advisory service. Actual notices: Playwright NO_COLOR/FORCE_COLOR and Git LF-to-CRLF. No live account was accessed; independent release review remains pending.
+Initial typecheck caught a new negative video-metadata fixture missing its fixture-required uploadStatus; the fixture now retains the normal uploadStatus and varies only privacy. The first authoritative run stopped at that type error. Final standalone typecheck and authoritative verification passed after correction. Initial restricted browser launch failed with `spawn EPERM`; permitted outside-sandbox execution using isolated temporary profiles passed both standalone E2E and final verify. Restricted audit could not reach the advisory endpoint/write its cache log; the permitted outside-sandbox requested audit passed. No test expectation or trust gate was weakened. Notices were Git LF-to-CRLF and Playwright NO_COLOR/FORCE_COLOR.
 
-Changed/new files: `src/provider/diagnostics.ts`, `youtube-schemas.ts`, `youtube-ingestion.ts`; `tools/provider-validation/contracts.ts`, `service.ts`, `entrypoints/provider-validation/main.tsx`; `tests/fixtures/provider.ts`, both provider unit suites and `tests/e2e/provider-validation.spec.ts`; this diagnosis, observation runbook, pending live-validation record and a follow-up link in the earlier pagination diagnosis. All remain unstaged/uncommitted. Suggested human commit: `chore: expose membership validation diagnostics`.
+All ten changed files remain unstaged/uncommitted: two provider source files, three test/fixture files and five documentation files. No provider-ingestion mapper, errors, runtime gate, auth, storage or production configuration changes were needed.
 
 ## One required human retry
 
-The rebuilt human validation package uses the same manifest/OAuth identity. SHA-256: manifest `4D87960FBABDE7E7A133E5A7D637F323506D3C2476B628AF40966EF8E448A3FF`; background `483B243DF132E051FDDB1A171D0F87396D8AD13F521C9927C77A7D08B99B63F1`. Source identity is baseline **plus this reviewed unstaged patch**, not the baseline commit alone.
+Review the unstaged correction. The validation package retains the existing manifest/OAuth identity. Source identity is `1b8b6e5` **plus this reviewed unstaged patch**, not the base commit alone. Use the final validation manifest/background hashes recorded below.
 
-1. Review the patch. Reload the existing unpacked extension in `chrome://extensions` at `C:\Dev\likedex\.output\provider-validation\chrome-mv3`. Close old Options/observation tabs and reopen Extension options. Load no TEST COMPOSITION directory.
-2. Confirm **Likedex — RELEASE VALIDATION ONLY**, version **0.1.0**, ID **mmefiakgfhddiojfdnkfpfpbkgbfgkgj**, and the hashes above. OAuth client, read-only scope and permissions are unchanged.
-3. Confirm connected/read-only and the expected channel locally. If Connect is offered, complete the agreement if required and explicitly Connect once. An eligible existing connection can remain. Stop on a connection/precondition failure and copy only its sanitized failure.
-4. Open **non-destructive provider observation** from Options, close other Likedex pages, and click **Observe provider without syncing** once. Keep the page open until the final result; do not click Sync or alter likes.
-5. Copy the **entire final sanitized JSON**, especially `enumerationDiagnostic.invalidItems` with all ordinals/reasonCodes/flags/checks, plus pageChain and top-level reason/internalStop. Record actual local time/timezone, Chrome version, base commit plus patch/build hashes and unpacked install mode. Copy within ten minutes after the last update. Share no raw items/responses, IDs, dates, titles, tokens, HAR or DevTools output.
-6. Report that result for assessment, then disable the validation package as in the runbook. A specific live structural failure must be assessed against the committed spec before any contract correction; success alone cannot approve production.
+Final SHA-256 hashes in `C:\Dev\likedex\.output\provider-validation\chrome-mv3`:
 
-**Production gate remains false/closed. Pruning remains disabled. Phase 8 has not begun.** Exact live field identification still requires this one human observation; there is no justified contract fix in this patch.
+- `manifest.json`: `4D87960FBABDE7E7A133E5A7D637F323506D3C2476B628AF40966EF8E448A3FF`
+- `background.js`: `E76DCBA24A1DB133C600ABCC92D0A506558F5F847E3549C419BB767CC94982C0`
+
+1. In `chrome://extensions`, reload the existing unpacked extension at `C:\Dev\likedex\.output\provider-validation\chrome-mv3`. Close old Options/observation tabs and reopen **Details → Extension options**. Load no TEST COMPOSITION directory.
+2. Confirm **Likedex — RELEASE VALIDATION ONLY**, version **0.1.0**, ID **mmefiakgfhddiojfdnkfpfpbkgbfgkgj** and the final package hashes. Retain OAuth client `875739161327-ut8ca2iocubeq8a2a2eleu9kcdu6d1ue.apps.googleusercontent.com`, project `likedex-extension-prod`, scope `https://www.googleapis.com/auth/youtube.readonly` and existing permissions.
+3. Confirm connected/read-only and the intended channel locally. If Connect is offered, complete the agreement if required and explicitly **Connect YouTube** once. An eligible existing connection can remain. Stop on connection/precondition failure and share only its sanitized failure.
+4. Open **non-destructive provider observation** from Options, close other Likedex pages, then click **Observe provider without syncing** once. Keep the page open until the final result. Do not click Sync or change likes.
+5. Copy the **entire final sanitized JSON** within ten minutes of the last update: summary, pageChain, reasonCode, invalidItems, counts, hydration facts and internalStop, plus optional auth diagnostic. Confirm page eight hydrates and later pages run; success requires `status: "success"`, `bootstrapValidated: true` and `trustedCompletion: true`. Report actual counts/limitations rather than assuming the live count remains 3,547. Record actual Asia/Jerusalem time, Chrome version, source base plus patch/build hashes and unpacked install mode. Share no raw response/privacy string, IDs, titles, tokens, HAR or DevTools output.
+6. Report the evidence for assessment, then disable the validation package per the [runbook](provider-observation-runbook.md). Failure remains failure; stop on any new contradiction. Successful observation still requires a separate explicit human approval and deliberate reviewed enablement change.
+
+**Production Sync gate remains false/closed; pruning remains disabled. Phase 8 has not begun. Live validation remains PENDING until the human reruns the complete observation and its evidence is assessed.** Suggested human commit after review: `fix: tolerate unknown playlist item privacy status`. No commit is made automatically.

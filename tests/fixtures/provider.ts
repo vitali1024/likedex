@@ -24,12 +24,15 @@ export function metadata(index = 1) {
 }
 export function videosPage(items = [metadata()]) { return { kind: 'youtube#videoListResponse', items }; }
 
+export const UNKNOWN_PLAYLIST_PRIVACY_STATUS = 'synthetic-unrecognized-privacy';
+
 // Generated TEST fixture only; opaque token punctuation must survive URL encoding.
 export function generatedLikesPages(total = 3547) {
   return Array.from({ length: Math.ceil(total / 50) }, (_, pageIndex) => {
     const indices = Array.from({ length: Math.min(50, total - pageIndex * 50) }, (_, index) => pageIndex * 50 + index + 1);
     const next = pageIndex + 1 < Math.ceil(total / 50) ? `opaque +/= ${pageIndex + 1} ?&` : undefined;
-    return { next, membership: membershipPage(indices.map((index) => member(index)), next, total),
+    return { next, membership: membershipPage(indices.map((index) => index === 367
+      ? { ...member(index), status: { privacyStatus: UNKNOWN_PLAYLIST_PRIVACY_STATUS } } : member(index)), next, total),
       hydration: videosPage(indices.map((index) => metadata(index))) };
   });
 }
@@ -58,7 +61,8 @@ export function invalidMembershipCases(): { reason: MembershipItemReason; item: 
     { reason: 'membership-position-invalid', item: { ...base, snippet: { ...base.snippet, position: -1 } } },
     { reason: 'membership-status-missing', item: { ...base, status: undefined } },
     { reason: 'membership-status-invalid', item: { ...base, status: null } },
-    { reason: 'membership-privacy-status-invalid', item: { ...base, status: { privacyStatus: 'private-status-sentinel' } } },
+    ...[42, {}, null, [], true].map((privacyStatus) => ({ reason: 'membership-privacy-status-invalid' as const,
+      item: { ...base, status: { privacyStatus } } })),
     { reason: 'membership-playlist-conflict', item: { ...base, snippet: { ...base.snippet, playlistId: 'other-playlist' } } },
     { reason: 'membership-video-id-missing', item: { ...base, snippet: { ...base.snippet, resourceId: { kind: 'youtube#video' } }, contentDetails: {} } },
     { reason: 'membership-video-id-conflict', item: { ...base, contentDetails: { videoId: videoId(2) } } },

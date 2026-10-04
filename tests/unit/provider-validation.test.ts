@@ -11,7 +11,7 @@ import { validationSenderAllowed } from '@/tools/provider-validation/background'
 import { resultSchema, startSchema, type ValidationSummary } from '@/tools/provider-validation/contracts';
 import { NOW, OBSERVED, attempt, owner, success, video } from '../fixtures/storage';
 import { TOKEN_A, channelResponse, chromeIdentity, held, json, timing } from '../fixtures/authentication';
-import { member, membershipPage, metadata, videoId, videosPage, generatedLikesPages, invalidMembershipCases } from '../fixtures/provider';
+import { member, membershipPage, metadata, videoId, videosPage, generatedLikesPages, invalidMembershipCases, UNKNOWN_PLAYLIST_PRIVACY_STATUS } from '../fixtures/provider';
 
 let db: LikedexDatabase;
 let repository: LibraryRepository;
@@ -75,7 +75,7 @@ describe('Human release observation is non-destructive', () => {
     const generated = generatedLikesPages();
     const items = Array.from({ length: 50 }, (_, index): unknown => member(index + 351));
     const base = member(367);
-    items[16] = { ...base, snippet: { ...base.snippet, publishedAt: 123, position: -1 }, status: { privacyStatus: 'secret-status-value' } };
+    items[16] = { ...base, snippet: { ...base.snippet, publishedAt: 123, position: -1 }, status: { privacyStatus: UNKNOWN_PLAYLIST_PRIVACY_STATUS } };
     items[34] = { ...member(385), contentDetails: undefined };
     items[49] = { ...member(400), contentDetails: { videoId: videoId(1) } };
     const result = await setup([channelResponse(), ...generated.slice(0, 7).flatMap((page) => [page.membership, page.hydration]),
@@ -83,7 +83,7 @@ describe('Human release observation is non-destructive', () => {
     expect(result).toMatchObject({ status: 'failed', summary: { pages: 7, rawMemberships: 350, hydrationPages: 7, hydrated: 350, trustedCompletion: false },
       enumerationDiagnostic: { reasonCode: 'membership-liked-at-type-invalid', observedMembershipCount: 400,
         expectedTotal: 3547, reportedTotal: 3547, internalStop: 'none', invalidItems: [
-          { pageOrdinal: 8, itemOrdinal: 17, reasonCodes: ['membership-liked-at-type-invalid', 'membership-position-invalid', 'membership-privacy-status-invalid'],
+          { pageOrdinal: 8, itemOrdinal: 17, reasonCodes: ['membership-liked-at-type-invalid', 'membership-position-invalid'],
             fieldPresence: { contentVideoId: true, publishedAt: true, status: true }, likedAtParses: false, positionValid: false,
             privacyStatusRecognized: false, videoIdsAgree: true, playlistIdMatchesExpected: true },
           { pageOrdinal: 8, itemOrdinal: 35, reasonCodes: ['membership-content-details-missing'],
@@ -92,7 +92,7 @@ describe('Human release observation is non-destructive', () => {
         ] } });
     expect(result.enumerationDiagnostic.pageChain.at(-1)).toMatchObject({ pageOrdinal: 8, itemCount: 50,
       tokenRelation: 'fresh', hydrationRequestedCount: null, hydrationReturnedCount: null });
-    for (const secret of ['secret-status-value', 'private-next-token', videoId(367), 'source-367', '2026-09-01']) expect(JSON.stringify(result)).not.toContain(secret);
+    for (const secret of [UNKNOWN_PLAYLIST_PRIVACY_STATUS, 'private-next-token', videoId(367), 'source-367', '2026-09-01']) expect(JSON.stringify(result)).not.toContain(secret);
   });
   it('reports date parsing as a structural fact without rejecting an unusable date string', async () => {
     const item = { ...member(), status: undefined, snippet: { ...member().snippet, publishedAt: 'private-unusable-date' } };
@@ -139,20 +139,22 @@ describe('Human release observation is non-destructive', () => {
     expect(scan.chrome.getAuthToken.mock.calls.every(([args]) => args?.interactive === false)).toBe(true);
     expect(resultSchema.safeParse(result).success).toBe(true);
   });
-  it('observes the generated 3547-item chain without mutation and exposes only safe page facts', async () => {
+  it('observes 3547 memberships including unknown page-eight privacy without mutation', async () => {
     const generated = generatedLikesPages();
     const scan = setup([channelResponse(), ...generated.flatMap((page) => [page.membership, page.hydration])]);
     const result = await scan.run();
     expect(result).toMatchObject({ status: 'success', summary: { pages: 71, rawMemberships: 3547,
       uniqueMemberships: 3547, hydrated: 3547, hydrationPages: 71, trustedCompletion: true },
     enumerationDiagnostic: { reasonCode: 'trusted-complete', observedMembershipCount: 3547,
-      expectedTotal: 3547, reportedTotal: 3547, lastResponseHadNextPageToken: false, internalStop: 'none' } });
+      expectedTotal: 3547, reportedTotal: 3547, lastResponseHadNextPageToken: false, internalStop: 'none', invalidItems: [] } });
+    expect(scan.fetcher).toHaveBeenCalledTimes(143); // bootstrap plus all 71 membership/hydration pairs
+    expect(new URL(scan.fetcher.mock.calls[16]![0]).searchParams.get('id')?.split(',')).toContain(videoId(367));
     expect(result.enumerationDiagnostic.pageChain).toHaveLength(71);
     expect(result.enumerationDiagnostic.pageChain[7]).toMatchObject({ pageOrdinal: 8, tokenRelation: 'fresh',
       itemCount: 50, hydrationRequestedCount: 50, hydrationReturnedCount: 50 });
     expect(result.enumerationDiagnostic.pageChain.at(-1)).toMatchObject({ pageOrdinal: 71, tokenRelation: 'none',
       itemCount: 47, hydrationRequestedCount: 47, hydrationReturnedCount: 47 });
-    for (const secret of [TOKEN_A, 'owner-a', 'likes-owner-a', 'source-1', videoId(), 'Video 1', 'opaque +/=']) {
+    for (const secret of [UNKNOWN_PLAYLIST_PRIVACY_STATUS, TOKEN_A, 'owner-a', 'likes-owner-a', 'source-1', videoId(), 'Video 1', 'opaque +/=']) {
       expect(JSON.stringify(result)).not.toContain(secret);
     }
     expect(resultSchema.safeParse({ ...result, enumerationDiagnostic: { ...result.enumerationDiagnostic,

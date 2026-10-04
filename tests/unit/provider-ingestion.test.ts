@@ -4,10 +4,10 @@ import { ChromeIdentityAdapter } from '@/src/auth/chrome-identity';
 import { GoogleAuthorizationRequests } from '@/src/auth/google-requests';
 import type { RequestTiming } from '@/src/auth/google-requests';
 import { YouTubeLikedVideosProvider, isTrustedProviderCompletion, type ProviderEvent, type ProviderPage } from '@/src/provider/youtube-ingestion';
-import { canonicalTimestamp, durationSeconds } from '@/src/provider/youtube-schemas';
+import { canonicalTimestamp, durationSeconds, validateMembershipPage } from '@/src/provider/youtube-schemas';
 import { videoSchema } from '@/src/domain/contracts';
 import { TOKEN_A, TOKEN_B, bootstrap, channelResponse, chromeIdentity, held, json, timing } from '../fixtures/authentication';
-import { context, member, membershipPage, metadata, videoId, videosPage, generatedLikesPages, invalidMembershipCases } from '../fixtures/provider';
+import { context, member, membershipPage, metadata, videoId, videosPage, generatedLikesPages, invalidMembershipCases, UNKNOWN_PLAYLIST_PRIVACY_STATUS } from '../fixtures/provider';
 import type { MembershipItemDiagnostic } from '@/src/provider/diagnostics';
 
 function setup(bodies: unknown[] = [membershipPage(), videosPage()]) {
@@ -34,8 +34,25 @@ async function rejectsWithoutCompletion(body: unknown, code?: string) {
 afterEach(() => vi.useRealTimers());
 
 describe('Provider request shape and streaming (AC-RECON-005/006)', () => {
-  it('traverses 3547 memberships / 71 pages with opaque tokens, batched hydration and terminal-only trust', async () => {
+  it('accepts the otherwise valid page-eight unknown privacy member, hydrates it and continues to page nine', async () => {
+    const generated = generatedLikesPages(450);
+    const scan = setup(generated.flatMap((page) => [page.membership, page.hydration]));
+    const events = await scan.run();
+    const eighth = pages(events)[7]!;
+    expect(eighth).toMatchObject({ pageNumber: 8, terminal: false, progress: { rawItems: 400 } });
+    expect(eighth.records[16]).toMatchObject({ videoId: videoId(367), membershipSourceIds: ['source-367'],
+      likedAt: '2026-09-01T10:00:00.000Z', availability: { state: 'available', evidence: 'public' } });
+    expect(new URL(scan.fetcher.mock.calls[15]![0]).searchParams.get('id')?.split(',')).toContain(videoId(367));
+    expect(pages(events)[8]).toMatchObject({ pageNumber: 9, terminal: true });
+    expect(new URL(scan.fetcher.mock.calls[16]![0]).searchParams.get('pageToken')).toBe(generated[7]!.next);
+    expect(scan.fetcher).toHaveBeenCalledTimes(18);
+    expect(isTrustedProviderCompletion(events.at(-1))).toBe(true);
+    expect(events.at(-1)).toMatchObject({ progress: { pagesAccepted: 9, rawItems: 450, uniqueMembership: 450, estimatedTotal: 450 } });
+    expect(JSON.stringify(events)).not.toContain(UNKNOWN_PLAYLIST_PRIVACY_STATUS);
+  });
+  it('traverses 3547 memberships / 71 pages including unknown page-eight privacy with terminal-only trust', async () => {
     const generated = generatedLikesPages();
+    expect(generated[7]!.membership.items[16]).toMatchObject({ status: { privacyStatus: UNKNOWN_PLAYLIST_PRIVACY_STATUS } });
     const scan = setup(generated.flatMap((page) => [page.membership, page.hydration]));
     const iterator = scan.provider.enumerateLikedVideos(context, scan.abort.signal);
     for (const [index, fixture] of generated.entries()) {
@@ -43,6 +60,13 @@ describe('Provider request shape and streaming (AC-RECON-005/006)', () => {
       expect(event).toMatchObject({ kind: 'page', pageNumber: index + 1,
         terminal: index === 70, progress: { rawItems: Math.min((index + 1) * 50, 3547) } });
       expect(isTrustedProviderCompletion(event)).toBe(false);
+      if (index === 7) {
+        expect(event).toMatchObject({ records: expect.arrayContaining([expect.objectContaining({
+          videoId: videoId(367), membershipSourceIds: ['source-367'], likedAt: '2026-09-01T10:00:00.000Z',
+          availability: { state: 'available', evidence: 'public' },
+        })]) });
+        expect(JSON.stringify(event)).not.toContain(UNKNOWN_PLAYLIST_PRIVACY_STATUS);
+      }
       expect(scan.fetcher).toHaveBeenCalledTimes((index + 1) * 2);
       const membershipUrl = new URL(scan.fetcher.mock.calls[index * 2]![0]);
       expect(membershipUrl.searchParams.get('pageToken')).toBe(index === 0 ? null : generated[index - 1]!.next);
@@ -215,6 +239,23 @@ describe('Fail-closed membership validation (AC-RECON-003/004/007)', () => {
 });
 
 describe('Membership versus hydration (AC-RECON-008–011)', () => {
+  it.each([
+    [videosPage(), { state: 'available', evidence: 'public' }],
+    [videosPage([{ ...metadata(), status: { privacyStatus: 'private', uploadStatus: 'processed' } }]), { state: 'unavailable', evidence: 'private' }],
+    [videosPage([{ ...metadata(), status: {} } as ReturnType<typeof metadata>]), { state: 'unknown', evidence: 'unknown' }],
+    [videosPage([]), { state: 'unknown', evidence: 'lookup-omitted' }],
+  ])('unknown playlist privacy adds no availability evidence; hydration determines %j', async (hydration, expected) => {
+    const item = { ...member(), status: { privacyStatus: UNKNOWN_PLAYLIST_PRIVACY_STATUS } };
+    expect(validateMembershipPage(membershipPage([item]), bootstrap.likesPlaylistId).memberships).toEqual([
+      { sourceId: 'source-1', videoId: videoId(), likedAt: '2026-09-01T10:00:00.000Z', position: 0 },
+    ]);
+    const scan = setup([membershipPage([item]), hydration]);
+    const events = await scan.run();
+    expect(pages(events)[0]!.records[0]!.availability).toEqual(expected);
+    expect(isTrustedProviderCompletion(events.at(-1))).toBe(true);
+    expect(scan.fetcher).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(events)).not.toContain(UNKNOWN_PLAYLIST_PRIVACY_STATUS);
+  });
   it('C: missing requested metadata preserves the member and trustworthy completion', async () => {
     const scan = setup([membershipPage(), videosPage([])]);
     const events = await scan.run();
@@ -290,6 +331,7 @@ describe('Membership versus hydration (AC-RECON-008–011)', () => {
     videosPage([{ ...metadata(), snippet: undefined } as unknown as ReturnType<typeof metadata>]),
     videosPage([{ ...metadata(), contentDetails: undefined } as unknown as ReturnType<typeof metadata>]),
     videosPage([{ ...metadata(), status: undefined } as unknown as ReturnType<typeof metadata>]),
+    videosPage([{ ...metadata(), status: { ...metadata().status, privacyStatus: UNKNOWN_PLAYLIST_PRIVACY_STATUS } }]),
     videosPage([{ ...metadata(), snippet: { ...metadata().snippet, title: 42 } } as unknown as ReturnType<typeof metadata>]),
     videosPage([{ ...metadata(), snippet: { ...metadata().snippet, thumbnails: { medium: { url: 'https://evil.example/x' } } } } as ReturnType<typeof metadata>]),
   ])('malformed hydration %# preserves failure and yields no trusted completion', async (body) => {

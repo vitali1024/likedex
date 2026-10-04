@@ -16,7 +16,9 @@ const playlistItem = z.object({
     publishedAt: timestamp.optional(), position: count.optional(),
   }),
   contentDetails: z.object({ videoId: videoIdSchema.optional() }),
-  status: z.object({ privacyStatus: privacy.optional() }),
+  // Playlist-item privacy is string metadata, not membership identity or video
+  // availability evidence. Unrecognized strings stay outside domain records.
+  status: z.object({ privacyStatus: z.string().optional() }),
 });
 const playlistEnvelope = z.object({
   kind: z.literal('youtube#playlistItemListResponse'), items: z.array(z.unknown()).max(50),

@@ -33,6 +33,8 @@ export const membershipItemDiagnosticSchema = z.strictObject({
   playlistIdValid: z.boolean().nullable(), resourceKindIsVideo: z.boolean().nullable(),
   snippetVideoIdValid: z.boolean().nullable(), contentVideoIdValid: z.boolean().nullable(),
   videoIdsAgree: z.boolean().nullable(), playlistIdMatchesExpected: z.boolean().nullable(),
+  // Recognition is a metadata fact, not a membership trust gate. A tolerated
+  // unfamiliar string can be false here when another field rejects the item.
   likedAtParses: z.boolean().nullable(), positionValid: z.boolean().nullable(), privacyStatusRecognized: z.boolean().nullable(),
 });
 export type MembershipItemDiagnostic = z.infer<typeof membershipItemDiagnosticSchema>;
