@@ -4,7 +4,7 @@ Likedex is a planned Chrome extension for browsing, searching, and revisiting a 
 
 Its core principles are local-first browsing, read-only YouTube access, explicit library ownership, safe synchronization, and truthful status. Planned surfaces are a full-size Options page and a compact Side Panel, with Export Data, Clear Local Data, and Disconnect YouTube controls.
 
-**Status:** Phase 6 integrates the committed authentication, provider, storage and synchronization services through [typed runtime messaging and MV3 lifecycle recovery](docs/runtime-lifecycle.md). Production Sync remains **fail-closed**: `provider-validation-required` is returned without request-induced storage/sync mutation until live provider evidence and explicit human approval permit deliberate enablement. Separate deterministic tests inject an enabled gate. Options and Side Panel still display foundation placeholders; product UI and release submissions remain future work. [Live-provider validation](docs/release/live-provider-validation.md) remains **PENDING**; no real-account success is claimed.
+**Status:** Phase 7 replaces the Options placeholder with [explicit connection/onboarding and a local library experience](docs/options-ui.md), using Phase 6 [typed runtime messaging and MV3 lifecycle recovery](docs/runtime-lifecycle.md). Options supports available-only browsing, search, focused filters, seven sorts, 50-row pages, persistent wide detail and narrow detail/Back, canonical links and truthful sync/error states. Production Sync remains **fail-closed**: `provider-validation-required` is returned without request-induced storage/sync mutation until live provider evidence and explicit human approval permit deliberate enablement. Side Panel still displays its foundation placeholder; Settings/data controls and release submissions remain future work. [Live-provider validation](docs/release/live-provider-validation.md) remains **PENDING**; no real-account success is claimed.
 
 ## Foundation development and verification
 
@@ -29,20 +29,21 @@ On Linux CI, install browser system dependencies with `npx playwright install --
 | `npm run verify:provider` | Focused validated membership/hydration, streaming completion, token/count anomalies and bounded request tests |
 | `npm run verify:sync` | Focused domain/storage/provider, synchronization and trusted reconciliation regressions |
 | `npm run verify:runtime` | Typed messages, closed gate, clients, prompt start, recovery, cleanup, cross-client observation and deadline/resume tests |
+| `npm run verify:ui` | Pure local query boundaries, unknowns, ordering, pagination, performance and Options presentation |
 | `npm run build` | Production MV3 extension at `.output/chrome-mv3` |
 | `npm run check:build` | Inspect production OAuth/client/scope, permissions/CSP, key/derived Store ID, entries, icons and unwanted test/development/secret artifacts |
-| `npm run test:e2e` | Production extension shells/Store ID, typed runtime, closed gate, actual worker stop/restart and browser IndexedDB interruption recovery; no live OAuth |
+| `npm run test:e2e` | Real production Options first run/Store ID/runtime/worker recovery plus a separate Options browser composition for local interaction, clipboard, gate UX, responsive keyboard paths and expiry; no live OAuth |
 | `npm run verify` | Lint → types → unit tests → build → artifact checks → browser shell smoke |
 
 The browser smoke requires `npm run build` first when run alone. It tests real extension page mounting, API configuration and the loaded extension ID; it does **not** exercise native Chrome toolbar clicking. For that manual check, load `.output/chrome-mv3` unpacked through `chrome://extensions`, open Options from the extension menu, pin Likedex, and click its toolbar icon to open the Side Panel. The Store public key in `wxt.config.ts` pins unpacked builds to the reserved ID `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`.
 
 TypeScript inherits WXT's `skipLibCheck` for dependency declaration compatibility; strict checking remains enabled for project source, configuration and tests. ESLint 9 and TypeScript 5.9 are intentionally pinned within the lint plugins' supported peer ranges; npm reports ESLint 9's upstream support deprecation. Browser execution may need permission to spawn Chromium in a restricted agent sandbox. A blocked browser launch fails verification and is never treated as a passing smoke test.
 
-Production composition lives in `entrypoints/` and `src/`. Tests live exclusively in `tests/`; production imports of tests, fixtures, mocks, demos or test runners are forbidden by lint. No fixture data or runtime fixture switch exists. Future domain/provider/storage/runtime/query tests and the separate product E2E fixture composition must extend verification as their phases are implemented, reaching the full contract by Phase 10. Current foundation results do not establish product or release acceptance.
+Production composition lives in `entrypoints/` and `src/`. Tests live exclusively in `tests/`; production imports of tests, fixtures, mocks, demos or test runners are forbidden by lint. Production has no fixture data or runtime fixture switch. Playwright builds the explicitly identified `tests/options-harness/` entry into `.output/options-test-composition`; its test client injects fixture responses while Sync reaches the actual closed production background. It never overwrites `.output/chrome-mv3`. No new dependency or extension permission was added. The thumbnail CSP permits only this extension and HTTPS `i.ytimg.com`. Later surfaces/data controls must extend verification toward the Phase 10 contract. Maker results do not establish independent review or release acceptance.
 
 The original foundation icons are a white L on a dark square, checked in at 16, 32, 48 and 128 pixels. Regenerate them with `node scripts/generate-icons.mjs`. Final Store assets and exact-package smoke testing belong to later release work.
 
-The human owner completed the Chrome Web Store **draft** reservation with version **0.1.0**; [release documentation](docs/release/chrome-web-store.md#reserved-chrome-web-store-identity) records the reserved identity. The next upload must use a version greater than 0.1.0; Phase 6 keeps the current version. The human-supplied public project/client configuration is recorded in [OAuth readiness](docs/release/oauth-verification.md). Deterministic manifest checks establish configuration agreement, not live OAuth success or public verification. After human review/commit of Phase 6, the next phase is **Phase 7 — Options Library UI**, using **GPT-6.1 Sol, Medium**. Live observation, preserved evidence and explicit human approval must precede production sync/pruning enablement. Independent auth/storage/provider/lifecycle review remains required before release.
+The human owner completed the Chrome Web Store **draft** reservation with version **0.1.0**; [release documentation](docs/release/chrome-web-store.md#reserved-chrome-web-store-identity) records the reserved identity. The next upload must use a version greater than 0.1.0; Phase 7 keeps the current version. The human-supplied public project/client configuration is recorded in [OAuth readiness](docs/release/oauth-verification.md). Deterministic manifest checks establish configuration agreement, not live OAuth success or public verification. After human review/commit of Phase 7, the next phase is **Phase 8 — Side Panel Compact Experience**, recommended maker **GPT-6.1 Sol, High** for this handoff. Live observation, preserved evidence and explicit human approval must precede production sync/pruning enablement. Independent auth/storage/provider/lifecycle review remains required before release.
 
 ## Documentation
 
@@ -56,6 +57,7 @@ The human owner completed the Chrome Web Store **draft** reservation with versio
 - [Provider ingestion](docs/provider-ingestion.md)
 - [Synchronization and production gate](docs/synchronization.md)
 - [Runtime and MV3 lifecycle](docs/runtime-lifecycle.md)
+- [Options UI behavior and Phase 7 traceability](docs/options-ui.md)
 - [Chrome Web Store release](docs/release/chrome-web-store.md)
 - [OAuth verification readiness](docs/release/oauth-verification.md)
 - [Privacy and data inventory](docs/release/privacy-and-data.md)

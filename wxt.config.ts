@@ -13,7 +13,7 @@ export default defineConfig({
       scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
     },
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'self'; connect-src https://www.googleapis.com https://oauth2.googleapis.com",
+      extension_pages: "script-src 'self'; object-src 'self'; connect-src https://www.googleapis.com https://oauth2.googleapis.com; img-src 'self' https://i.ytimg.com",
     },
     // Public Store key pins unpacked builds to mmefiakgfhddiojfdnkfpfpbkgbfgkgj.
     key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2Mrsf7jhzWUVvet1U8+ivTvl7skABNZU3ZmlhBchXJ383YHZqNpQju8IUPfZprfoxlBoma1W9Cf6/T+Pc08PmzJS2P1gtHBQ2dsC0FGVVGPdVoq3BpHfA7sHphlorQ59217U4dEPB7KbUFmePOvC+UtJlc1LgVaLTRh1+9Ifiv32CeuHMMg56hqj3e+5O4aBPAfmhBMMfJ5g0xvE5QeNBIuCGVw1uCyVS9HQaZpKfpKnjgNK9WnbVE1JHYjFC4yF3t5k8/qc/Fo/wcClQu8nhrZBiddjbu8dYa6CfQqyeIlc7gTk8288emrXpOLl1qYwfy1spKCaYcd1f3rqnZEpsQIDAQAB',
