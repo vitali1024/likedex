@@ -37,7 +37,7 @@ function manualScheduler() {
     expect(job).toBeDefined(); job!.cancelled = true; job!.callback(); } };
 }
 function request(operation: RuntimeOperation): RuntimeRequest { return { protocolVersion: 1, requestId: REQUEST, operation, payload: {} }; }
-async function setup(options: { seed?: boolean; connected?: boolean; gate?: unknown; worker?: string } = {}) {
+async function setup(options: { seed?: boolean; connected?: boolean; gate?: unknown; worker?: string; diagnostics?: boolean } = {}) {
   let now = NOW;
   const listeners = new Set<(event: RevisionEvent) => void>();
   const events: RevisionEvent[] = [];
@@ -70,7 +70,7 @@ async function setup(options: { seed?: boolean; connected?: boolean; gate?: unkn
       auth.acceptSyncAuthorization(receipt); coordinator.authorizationValidated(receipt.scope);
     });
   const coordinator = new RuntimeCoordinator(repository, auth, sync, EXTENSION,
-    { providerValidationApproved: options.gate, now: () => now, scheduler: timers.scheduler });
+    { providerValidationApproved: options.gate, now: () => now, scheduler: timers.scheduler, diagnosticsEnabled: options.diagnostics ?? false });
   coordinators.push(coordinator);
   const client = () => new RuntimeClient({ send: (message) => coordinator.handle(message, SENDER),
     subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; } });
@@ -80,6 +80,17 @@ async function setup(options: { seed?: boolean; connected?: boolean; gate?: unkn
 async function records(db: LikedexDatabase) { return Promise.all(db.tables.map((table) => table.toArray())); }
 
 describe('Runtime production gate and validation (AC-SYNC-013; AC-SYNC-011)', () => {
+  it.each([false, true])('safe Connect diagnostics are included only by explicit validation composition: %s', async (diagnostics) => {
+    const h = await setup({ connected: false, diagnostics });
+    h.fetcher.mockRejectedValue(new TypeError('Illegal invocation SECRET'));
+    const result = await h.client().request('AUTH_CONNECT');
+    expect(result).toMatchObject({ ok: false, error: { code: 'auth-error', detail: { category: 'internal' } } });
+    if (result.ok) throw new Error('Expected failure');
+    if (diagnostics) expect(result.error.diagnostic).toEqual({ phase: 'bootstrap-fetch', endpoint: 'youtube.channels.list',
+      httpStatus: null, errorCode: 'fetch-invocation', retryOccurred: false });
+    else expect(result.error.diagnostic).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain('SECRET');
+  });
   it.each([PRODUCTION_PROVIDER_VALIDATION_APPROVED, undefined, null, 'true', 1, {}, false])(
     'closed/missing/malformed gate %j rejects with all records unchanged', async (gate) => {
       const h = await setup({ seed: true, gate });

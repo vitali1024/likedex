@@ -26,7 +26,7 @@ export interface AuthorizationCleanupResult {
   persistence: 'succeeded' | 'failed';
 }
 export class AuthorizationCheckFailure extends AuthenticationError {
-  constructor(failure: AuthenticationError, readonly cleanup: AuthorizationCleanupResult) { super(failure.code); }
+  constructor(failure: AuthenticationError, readonly cleanup: AuthorizationCleanupResult) { super(failure.code, failure.diagnostic); }
 }
 
 // Construct explicitly in the future background composition. No startup,

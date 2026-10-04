@@ -25,7 +25,7 @@ export function providerFailure(error: unknown): ProviderError | AuthenticationE
   if (error instanceof ProviderError) return error;
   if (error instanceof AuthenticationError) {
     // Retain approved auth/transport codes; annotate the ingestion phase.
-    const failure = new AuthenticationError(error.code);
+    const failure = new AuthenticationError(error.code, error.diagnostic);
     failure.detail.phase = 'scanning';
     return failure;
   }

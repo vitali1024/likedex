@@ -180,7 +180,7 @@ describe('Required authorization failure cleanup (AC-AUTH-004/009, AC-DATA-015/0
     expect(chrome.getAuthToken.mock.calls.every(([details]) => details.interactive === false)).toBe(true);
   });
   it('exhausted required network verification deletes with unverified reason, not external-revoke claim', async () => {
-    await seed(); fetcher.mockRejectedValue(new Error(TOKEN_A));
+    await seed(); fetcher.mockRejectedValue(new TypeError(TOKEN_A));
     await expect(service.validateAuthorization()).rejects.toMatchObject({ code: 'network', cleanup: { deletion: 'succeeded' } });
     await assertDeleted();
     expect((await repository.readControl()).lastCleanupReason).toBe('authorization-unverified');
@@ -190,7 +190,7 @@ describe('Required authorization failure cleanup (AC-AUTH-004/009, AC-DATA-015/0
     const before = await seed();
     await service.validateAuthorization();
     const validated = await repository.readSnapshot(now);
-    fetcher.mockRejectedValue(new Error('offline'));
+    fetcher.mockRejectedValue(new TypeError('offline'));
     await expect(requests.bootstrapSilently(new AbortController().signal)).rejects.toMatchObject({ code: 'network' });
     expect((await repository.readSnapshot(now)).videos).toEqual(before.videos);
     expect(await repository.readSnapshot(now)).toEqual(validated);

@@ -26,7 +26,7 @@ export class RuntimeCoordinator {
 
   constructor(private readonly repository: LibraryRepository, private readonly auth: AuthenticationService,
     private readonly sync: SynchronizationService, private readonly extensionId: string,
-    private readonly options: { providerValidationApproved?: unknown; now?: () => string; scheduler?: LifecycleScheduler } = {}) {}
+    private readonly options: { providerValidationApproved?: unknown; diagnosticsEnabled?: boolean; now?: () => string; scheduler?: LifecycleScheduler } = {}) {}
   private now(): string { return this.options.now?.() ?? new Date().toISOString(); }
 
   // Called only from the genuine sync owner-check observer after its persisted
@@ -203,7 +203,9 @@ export class RuntimeCoordinator {
     const request = parsed.success ? parsed.data : null;
     const envelope = { protocolVersion: 1 as const, requestId: request?.requestId ?? null,
       operation: request?.operation ?? null };
-    const reject = (error: RuntimeFailure): RuntimeResponse => ({ ...envelope, ok: false, error });
+    const reject = (error: RuntimeFailure, authError?: AuthenticationError): RuntimeResponse => ({ ...envelope, ok: false,
+      error: this.options.diagnosticsEnabled && authError?.diagnostic
+        ? { ...error, diagnostic: authError.diagnostic } : error });
     if (!request) return reject(failure('invalid-request'));
     // Internal extension pages only. No content-script or externally-connectable
     // command path can cause interactive consent or destructive operations.
@@ -225,9 +227,9 @@ export class RuntimeCoordinator {
       if (error instanceof AuthorizationCheckFailure) {
         const detail = ['auth-required', 'permission-denied'].includes(error.code) ? error.detail
           : { ...error.detail, category: 'authorization-unverified' as const, messageKey: 'access-unverified' as const };
-        return reject(failure('auth-error', detail, error.cleanup));
+        return reject(failure('auth-error', detail, error.cleanup), error);
       }
-      if (error instanceof AuthenticationError) return reject(failure('auth-error', error.detail));
+      if (error instanceof AuthenticationError) return reject(failure('auth-error', error.detail), error);
       return reject(failure('internal-error'));
     }
   }

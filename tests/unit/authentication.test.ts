@@ -59,6 +59,56 @@ describe('Chrome Identity boundary (AC-AUTH-002–005 service portions)', () => 
 });
 
 describe('Authenticated bootstrap requests (AC-AUTH-004, AC-IDENTITY-001/002)', () => {
+  it.each([
+    [new TypeError(`Illegal invocation ${TOKEN_A}`), 'fetch-invocation', 'bootstrap-fetch', null, 1],
+    [new Error(`programming failure ${TOKEN_A}`), 'unexpected', 'bootstrap-fetch', null, 1],
+    [new TypeError(`Failed to fetch ${TOKEN_A}`), 'network', 'bootstrap-fetch', null, 3],
+  ] as const)('sanitizes transport exceptions with accurate category: %s', async (error, code, phase, httpStatus, calls) => {
+    const { requests, fetcher, signal } = setup();
+    fetcher.mockRejectedValue(error);
+    const result = await requests.connectExplicitly(signal).catch((failure: unknown) => failure);
+    expect(result).toMatchObject({ code, diagnostic: { phase, endpoint: 'youtube.channels.list', httpStatus,
+      errorCode: code, retryOccurred: calls > 1 } });
+    expect(JSON.stringify(result)).not.toContain(TOKEN_A);
+    expect(fetcher).toHaveBeenCalledTimes(calls);
+  });
+  it.each([
+    [json({}, 400), 'unavailable', 'bootstrap-http', 400],
+    [json({}, 403), 'permission-denied', 'bootstrap-http', 403],
+    [new Response('{broken'), 'malformed-bootstrap', 'bootstrap-parse', 200],
+    [json({}), 'malformed-bootstrap', 'bootstrap-validate', 200],
+  ] as const)('reports safe HTTP/parse/validation diagnostics %#', async (response, code, phase, httpStatus) => {
+    const { requests, fetcher, signal } = setup();
+    fetcher.mockResolvedValue(response);
+    await expect(requests.connectExplicitly(signal)).rejects.toMatchObject({ code,
+      diagnostic: { phase, endpoint: 'youtube.channels.list', httpStatus, errorCode: code, retryOccurred: false } });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('distinguishes the request deadline from caller cancellation', async () => {
+    const { identity, clock } = setup();
+    const timeout = new AbortController(); timeout.abort();
+    const fetcher = vi.fn().mockRejectedValue(new DOMException('deadline', 'AbortError'));
+    const requests = new GoogleAuthorizationRequests(identity, fetcher, { ...clock, timeout: () => timeout.signal });
+    await expect(requests.connectExplicitly(new AbortController().signal)).rejects.toMatchObject({ code: 'request-timeout',
+      diagnostic: { phase: 'bootstrap-fetch', httpStatus: null, retryOccurred: true } });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    const caller = new AbortController();
+    fetcher.mockImplementationOnce(() => { caller.abort(); return Promise.reject(new DOMException('cancel', 'AbortError')); });
+    await expect(requests.connectExplicitly(caller.signal)).rejects.toMatchObject({ code: 'cancelled' });
+    expect(fetcher).toHaveBeenCalledTimes(4);
+  });
+  it('records OAuth acquisition and a second HTTP 401 without leaking tokens', async () => {
+    const { chrome, requests, fetcher, signal } = setup();
+    chrome.getAuthToken.mockRejectedValueOnce(new Error(`Network connection failed ${TOKEN_A}`));
+    await expect(requests.connectExplicitly(signal)).rejects.toMatchObject({ code: 'network',
+      diagnostic: { phase: 'oauth-token', endpoint: null, httpStatus: null, retryOccurred: false } });
+    expect(fetcher).not.toHaveBeenCalled();
+    fetcher.mockImplementation(() => Promise.resolve(json({}, 401)));
+    const result = await requests.connectExplicitly(signal).catch((failure: unknown) => failure);
+    expect(result).toMatchObject({ code: 'auth-required', diagnostic: { phase: 'bootstrap-http', httpStatus: 401, retryOccurred: true } });
+    expect(JSON.stringify(result)).not.toContain(TOKEN_A);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
   it('uses exact channels.list GET; returns only validated identity, never the token', async () => {
     const { requests, fetcher, signal } = setup();
     const result = await requests.bootstrapSilently(signal);
@@ -115,11 +165,11 @@ describe('Authenticated bootstrap requests (AC-AUTH-004, AC-IDENTITY-001/002)', 
   });
   it('preserves exhausted network failures, uses 1s/2s delays, and succeeds after a transient failure', async () => {
     const { requests, fetcher, clock, signal } = setup();
-    fetcher.mockRejectedValue(new Error(TOKEN_A));
+    fetcher.mockRejectedValue(new TypeError(TOKEN_A));
     await expect(requests.bootstrapSilently(signal)).rejects.toMatchObject({ code: 'network', message: 'Likedex authentication: network' });
     expect(fetcher).toHaveBeenCalledTimes(3);
     expect(clock.sleep.mock.calls.map(([ms]) => ms)).toEqual([1000, 2000]);
-    fetcher.mockReset().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(json());
+    fetcher.mockReset().mockRejectedValueOnce(new TypeError('offline')).mockResolvedValueOnce(json());
     await expect(requests.bootstrapSilently(signal)).resolves.toEqual(bootstrap);
   });
   it.each(['31', 'Sun, 04 Oct 2026 12:00:31 GMT'])('stops rather than waiting beyond 30s Retry-After: %s', async (header) => {

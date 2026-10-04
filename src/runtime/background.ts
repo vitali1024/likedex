@@ -11,7 +11,7 @@ import { RuntimeCoordinator } from './coordinator';
 // Deliberate production constant. No environment/config/message/UI override.
 // Enabling this requires live evidence, human approval and a reviewed change.
 export const PRODUCTION_PROVIDER_VALIDATION_APPROVED = false;
-export function startBackgroundRuntime(): RuntimeCoordinator {
+export function startBackgroundRuntime(diagnosticsEnabled = false): RuntimeCoordinator {
   z.config({ jitless: true }); // MV3 CSP: use interpreted validation, no runtime code generation.
   const repository = new LibraryRepository(new LikedexDatabase(), (control) => {
     void browser.runtime.sendMessage({ protocolVersion: 1, event: 'STATE_REVISION', revision: control.revision,
@@ -23,7 +23,7 @@ export function startBackgroundRuntime(): RuntimeCoordinator {
     auth.acceptSyncAuthorization(receipt); coordinator.authorizationValidated(receipt.scope);
   });
   const coordinator = new RuntimeCoordinator(repository, auth, sync, browser.runtime.id,
-    { providerValidationApproved: PRODUCTION_PROVIDER_VALIDATION_APPROVED });
+    { providerValidationApproved: PRODUCTION_PROVIDER_VALIDATION_APPROVED, diagnosticsEnabled });
   // Register synchronously; Chrome can deliver messages before startup finishes.
   browser.runtime.onMessage.addListener((message: unknown, sender, respond) => {
     void coordinator.handle(message, sender).then(respond);

@@ -6,6 +6,60 @@ import { channelResponse, TOKEN_A } from '../fixtures/authentication';
 import { member, membershipPage, metadata, videosPage } from '../fixtures/provider';
 import { attempt, OBSERVED, owner, success, video } from '../fixtures/storage';
 
+test('Options Connect uses native worker fetch with its required receiver', async () => {
+  const extensionPath = resolve('.output/native-fetch-test-composition');
+  await cp(resolve('.output/provider-validation/chrome-mv3'), extensionPath, { recursive: true });
+  const manifest = JSON.parse(await readFile(resolve(extensionPath, 'manifest.json'), 'utf8'));
+  manifest.name = 'Likedex — native fetch TEST COMPOSITION';
+  // Only this disposable test package accepts data URLs. Native fetch consumes
+  // a synthetic response without contacting Google or using a real account.
+  manifest.content_security_policy.extension_pages = manifest.content_security_policy.extension_pages
+    .replace('connect-src https://www.googleapis.com https://oauth2.googleapis.com',
+      'connect-src https://www.googleapis.com https://oauth2.googleapis.com data:');
+  await writeFile(resolve(extensionPath, 'manifest.json'), JSON.stringify(manifest));
+  const prelude = `(() => {
+    const nativeFetch = globalThis.fetch;
+    const body = ${JSON.stringify(channelResponse())};
+    chrome.identity.getAuthToken = async () => ({ token: ${JSON.stringify(TOKEN_A)}, grantedScopes: ['https://www.googleapis.com/auth/youtube.readonly'] });
+    globalThis.nativeFetchChecks = [];
+    globalThis.nativeFetchFailure = true;
+    globalThis.fetch = function(input, init) {
+      if (globalThis.nativeFetchFailure) throw new TypeError('Illegal invocation synthetic-private-diagnostic-sentinel');
+      const url = new URL(String(input));
+      globalThis.nativeFetchChecks.push({ correctUrl: url.href === 'https://www.googleapis.com/youtube/v3/channels?mine=true&part=id%2Csnippet%2CcontentDetails',
+        bearerCorrect: init.headers.Authorization === 'Bearer ' + ${JSON.stringify(TOKEN_A)}, method: init.method, activeSignal: !init.signal.aborted });
+      // Preserve the actual receiver: an arrow mock would conceal the bug.
+      return nativeFetch.call(this, 'data:application/json,' + encodeURIComponent(JSON.stringify(body)), init);
+    };
+  })();\n`;
+  await writeFile(resolve(extensionPath, 'background.js'), prelude + await readFile(resolve(extensionPath, 'background.js'), 'utf8'));
+  const context = await chromium.launchPersistentContext('', { channel: 'chromium', headless: true,
+    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`] });
+  try {
+    const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+    const id = new URL(worker.url()).hostname;
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${id}/options.html`);
+    await page.getByRole('checkbox').check();
+    await page.clock.install();
+    await page.getByRole('button', { name: 'Connect YouTube', exact: true }).click();
+    const diagnostic = page.getByRole('region', { name: 'Sanitized Connect diagnostic' });
+    await expect(diagnostic).toBeVisible();
+    expect(JSON.parse((await diagnostic.locator('pre').textContent())!)).toEqual({ phase: 'bootstrap-fetch',
+      endpoint: 'youtube.channels.list', httpStatus: null, errorCode: 'fetch-invocation', retryOccurred: false });
+    expect(await diagnostic.textContent()).not.toContain('synthetic-private-diagnostic-sentinel');
+    expect(await diagnostic.textContent()).not.toContain(TOKEN_A);
+    await page.clock.fastForward(600_001);
+    await expect(diagnostic).toHaveCount(0);
+    await worker.evaluate(() => { (globalThis as unknown as { nativeFetchFailure: boolean }).nativeFetchFailure = false; });
+    await page.getByRole('button', { name: 'Connect YouTube', exact: true }).click();
+    await expect(page.getByText('YouTube connected · read-only')).toBeVisible();
+    const checks = await worker.evaluate(() => (globalThis as unknown as { nativeFetchChecks: unknown[] }).nativeFetchChecks);
+    expect(checks.length).toBeGreaterThan(0);
+    expect(checks.every((check) => JSON.stringify(check) === JSON.stringify({ correctUrl: true, bearerCorrect: true, method: 'GET', activeSignal: true }))).toBe(true);
+  } finally { await context.close(); }
+});
+
 test('separate validation package uses Options Connect, observes without writes, and keeps production Sync closed', async () => {
   const extensionPath = resolve('.output/provider-validation-test-composition');
   await cp(resolve('.output/provider-validation/chrome-mv3'), extensionPath, { recursive: true });

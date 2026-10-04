@@ -1,10 +1,13 @@
 import type { DomainError } from '../domain/contracts';
+import { z } from 'zod';
 
 const errors = {
   'auth-required': ['authentication', 'connect-required'],
   'permission-denied': ['permission', 'permission-denied'],
   'oauth-configuration': ['oauth-configuration', 'configuration-error'],
   network: ['network', 'network-failed'],
+  'fetch-invocation': ['internal', 'unexpected-error'],
+  'request-timeout': ['network', 'network-failed'],
   unavailable: ['provider', 'provider-failed'],
   quota: ['quota', 'quota-exhausted'],
   'rate-limit': ['rate-limit', 'rate-limited'],
@@ -23,13 +26,27 @@ const errors = {
 } as const satisfies Record<string, readonly [DomainError['category'], DomainError['messageKey']]>;
 export type AuthenticationErrorCode = keyof typeof errors;
 
+// Closed allowlist: never serialize an exception, URL, header or provider body.
+export const authenticationDiagnosticSchema = z.strictObject({
+  phase: z.enum(['oauth-token', 'bootstrap-fetch', 'bootstrap-http', 'bootstrap-parse', 'bootstrap-validate',
+    'provider-fetch', 'provider-http', 'provider-parse', 'runtime']),
+  endpoint: z.enum(['youtube.channels.list', 'youtube.playlistItems.list', 'youtube.videos.list']).nullable(),
+  httpStatus: z.number().int().min(100).max(599).nullable(),
+  errorCode: z.enum(Object.keys(errors) as [AuthenticationErrorCode, ...AuthenticationErrorCode[]]),
+  retryOccurred: z.boolean(),
+});
+export type AuthenticationDiagnostic = z.infer<typeof authenticationDiagnosticSchema>;
+type DiagnosticContext = Omit<AuthenticationDiagnostic, 'errorCode'>;
+
 export class AuthenticationError extends Error {
   readonly detail: DomainError;
-  constructor(readonly code: AuthenticationErrorCode) {
+  readonly diagnostic: AuthenticationDiagnostic | undefined;
+  constructor(readonly code: AuthenticationErrorCode, context?: DiagnosticContext) {
     super(`Likedex authentication: ${code}`);
     this.name = 'AuthenticationError';
     const [category, messageKey] = errors[code];
     this.detail = { category, messageKey, phase: 'preparing' };
+    this.diagnostic = context ? authenticationDiagnosticSchema.parse({ ...context, errorCode: code }) : undefined;
   }
 }
 export function sanitizedFailure(error: unknown): AuthenticationError {

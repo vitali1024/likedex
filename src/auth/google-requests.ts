@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { TokenSource } from './chrome-identity';
-import { AuthenticationError, assertNotAborted } from './errors';
+import { AuthenticationError, assertNotAborted, sanitizedFailure, type AuthenticationDiagnostic } from './errors';
 import { validateBootstrap } from '../provider/youtube-bootstrap';
 import { authenticatedBootstrapSchema, type AuthenticatedYouTubeBootstrap } from '../domain/authentication';
 import { videoIdSchema } from '../provider/youtube-schemas';
@@ -77,7 +77,9 @@ export interface YouTubeSyncSession extends YouTubeReadSession {
 }
 
 export class GoogleAuthorizationRequests {
-  constructor(private readonly tokens: TokenSource, private readonly fetcher: FetchBoundary = fetch,
+  // Native browser fetch requires the global receiver. A stored bare fetch
+  // invoked as this.fetcher() throws Illegal invocation before any HTTP request.
+  constructor(private readonly tokens: TokenSource, private readonly fetcher: FetchBoundary = fetch.bind(globalThis),
     private readonly timing: RequestTiming = defaultTiming) {}
 
   // Includes JSON/body consumption in the 20s fetch deadline. Redirects may
@@ -91,12 +93,17 @@ export class GoogleAuthorizationRequests {
         cache: 'no-store', signal: AbortSignal.any([signal, timeout]) });
       const result = await read(response);
       assertNotAborted(signal);
-      if (timeout.aborted) throw new AuthenticationError('network');
+      if (timeout.aborted) throw new AuthenticationError('request-timeout');
       return result;
     } catch (error) {
       assertNotAborted(signal);
+      if (timeout.aborted) throw new AuthenticationError('request-timeout');
       if (error instanceof AuthenticationError) throw error;
-      throw new AuthenticationError('network');
+      if (error instanceof TypeError && /illegal invocation/i.test(error.message)) throw new AuthenticationError('fetch-invocation');
+      if (error instanceof TypeError || (error instanceof DOMException && error.name === 'AbortError')) {
+        throw new AuthenticationError('network');
+      }
+      throw new AuthenticationError('unexpected');
     }
   }
 
@@ -125,29 +132,43 @@ export class GoogleAuthorizationRequests {
       if (budget) this.assertBudget(budget, signal);
       let retryAfter: string | null = null;
       let transient = false;
+      const bootstrap = url === BOOTSTRAP_URL;
+      let phase: AuthenticationDiagnostic['phase'] = bootstrap ? 'bootstrap-fetch' : 'provider-fetch';
+      const endpoint: AuthenticationDiagnostic['endpoint'] = bootstrap ? 'youtube.channels.list'
+        : url.startsWith('https://www.googleapis.com/youtube/v3/playlistItems?') ? 'youtube.playlistItems.list' : 'youtube.videos.list';
+      let httpStatus: number | null = null;
       try {
         const requestSignal = budget ? AbortSignal.any([signal,
           this.timing.timeout?.(Math.max(1, Math.floor(600_000 - (this.timing.now() - budget.startedAt))))
             ?? AbortSignal.timeout(Math.max(1, Math.floor(600_000 - (this.timing.now() - budget.startedAt))))]) : signal;
         const body = await this.fetchAndRead(url, { method: 'GET', headers: { Authorization: `Bearer ${token}` } }, requestSignal,
           async (response) => {
+            httpStatus = response.status;
             if (!response.ok) {
+              phase = bootstrap ? 'bootstrap-http' : 'provider-http';
               const failure = await httpFailure(response);
               transient = failure.code === 'rate-limit'
                 || (failure.code === 'unavailable' && [500, 502, 503, 504].includes(response.status));
               retryAfter = response.headers.get('Retry-After');
               throw failure;
             }
+            phase = bootstrap ? 'bootstrap-parse' : 'provider-parse';
             try { return await response.json() as unknown; }
-            catch (error) { throw new AuthenticationError(error instanceof SyntaxError ? malformed : 'network'); }
+            catch (error) {
+              if (error instanceof SyntaxError) throw new AuthenticationError(malformed);
+              throw error; // Body transport errors are classified at the fetch boundary.
+            }
           });
         if (budget) this.assertBudget(budget, signal);
         return body;
       } catch (error) {
         if (budget) this.assertBudget(budget, signal);
-        if (!(error instanceof AuthenticationError) || retries.count >= 2 || (!transient && error.code !== 'network')) throw error;
+        const failure = sanitizedFailure(error);
+        const diagnosed = new AuthenticationError(failure.code, { phase, endpoint, httpStatus,
+          retryOccurred: retries.count > 0 || (budget?.recovered ?? false) });
+        if (retries.count >= 2 || (!transient && !['network', 'request-timeout'].includes(failure.code))) throw diagnosed;
         const delay = this.retryDelay(retryAfter, retries.count);
-        if (delay === null) throw error;
+        if (delay === null) throw diagnosed;
         if (budget) {
           if (budget.retries >= 6 || this.timing.now() - budget.startedAt + delay >= 600_000) {
             throw new AuthenticationError('request-budget');
@@ -162,12 +183,22 @@ export class GoogleAuthorizationRequests {
 
   private async bootstrapRequest(token: string, signal: AbortSignal, budget?: RequestBudget,
     retries?: RequestRetries): Promise<AuthenticatedYouTubeBootstrap> {
-    return validateBootstrap(await this.jsonRequest(token, BOOTSTRAP_URL, signal, 'malformed-bootstrap', budget, retries));
+    const body = await this.jsonRequest(token, BOOTSTRAP_URL, signal, 'malformed-bootstrap', budget, retries);
+    try { return validateBootstrap(body); }
+    catch (error) {
+      throw new AuthenticationError(sanitizedFailure(error).code, { phase: 'bootstrap-validate',
+        endpoint: 'youtube.channels.list', httpStatus: 200, retryOccurred: (retries?.count ?? 0) > 0 || (budget?.recovered ?? false) });
+    }
   }
 
   private async acquire(interactive: boolean, signal: AbortSignal): Promise<string> {
     assertNotAborted(signal);
-    const token = await (interactive ? this.tokens.connectInteractively() : this.tokens.getTokenSilently());
+    let token: string;
+    try { token = await (interactive ? this.tokens.connectInteractively() : this.tokens.getTokenSilently()); }
+    catch (error) {
+      throw new AuthenticationError(sanitizedFailure(error).code, { phase: 'oauth-token', endpoint: null,
+        httpStatus: null, retryOccurred: false });
+    }
     if (signal.aborted) {
       await this.tokens.invalidateCachedToken(token);
       throw new AuthenticationError('cancelled');
@@ -197,9 +228,16 @@ export class GoogleAuthorizationRequests {
       }
     }
   }
-  private bootstrap(interactive: boolean, signal: AbortSignal): Promise<AuthenticatedYouTubeBootstrap> {
+  private async bootstrap(interactive: boolean, signal: AbortSignal): Promise<AuthenticatedYouTubeBootstrap> {
     const retries = { count: 0 };
-    return this.authenticated(interactive, signal, (token) => this.bootstrapRequest(token, signal, undefined, retries), { recovered: false });
+    const recovery = { recovered: false };
+    try {
+      return await this.authenticated(interactive, signal, (token) => this.bootstrapRequest(token, signal, undefined, retries), recovery);
+    } catch (error) {
+      const failure = sanitizedFailure(error);
+      throw failure.diagnostic ? new AuthenticationError(failure.code, { ...failure.diagnostic,
+        retryOccurred: failure.diagnostic.retryOccurred || recovery.recovered || retries.count > 0 }) : failure;
+    }
   }
   bootstrapSilently(signal: AbortSignal): Promise<AuthenticatedYouTubeBootstrap> { return this.bootstrap(false, signal); }
   connectExplicitly(signal: AbortSignal): Promise<AuthenticatedYouTubeBootstrap> { return this.bootstrap(true, signal); }

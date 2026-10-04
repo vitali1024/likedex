@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { errorSchema } from '../../src/domain/contracts';
+import { authenticationDiagnosticSchema } from '../../src/auth/errors';
 
 export const VALIDATION_PORT = 'likedex-release-provider-observation-v1';
 export const startSchema = z.strictObject({ operation: z.literal('OBSERVE_PROVIDER') });
@@ -15,7 +16,7 @@ export type ValidationSummary = z.infer<typeof summarySchema>;
 export const resultSchema = z.discriminatedUnion('status', [
   z.strictObject({ status: z.literal('success'), summary: summarySchema.extend({ trustedCompletion: z.literal(true) }) }),
   z.strictObject({ status: z.literal('failed'), summary: summarySchema.extend({ trustedCompletion: z.literal(false) }),
-    error: errorSchema }),
+    error: errorSchema, diagnostic: authenticationDiagnosticSchema.optional() }),
 ]);
 export type ValidationResult = z.infer<typeof resultSchema>;
 export const eventSchema = z.discriminatedUnion('event', [

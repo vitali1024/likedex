@@ -85,6 +85,7 @@ export async function observeProvider(requests: Requests, read: () => Promise<Pr
     summary.trustedCompletion = false;
     const detail = error instanceof AuthenticationError || error instanceof ProviderError
       ? error.detail : new AuthenticationError('unexpected').detail;
-    return resultSchema.parse({ status: 'failed', summary, error: detail });
+    return resultSchema.parse({ status: 'failed', summary, error: detail,
+      ...(error instanceof AuthenticationError && error.diagnostic ? { diagnostic: error.diagnostic } : {}) });
   }
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { authenticationDiagnosticSchema } from '../auth/errors';
 import { authenticatedBootstrapSchema } from '../domain/authentication';
 import { attemptStateSchema, controlSchema, errorSchema, instantSchema, ownerSchema, syncSchema, videoSchema } from '../domain/contracts';
 
@@ -52,6 +53,7 @@ export type RuntimeResult<K extends RuntimeOperation> = z.infer<(typeof resultSc
 export const failureSchema = z.strictObject({ code: z.enum(['invalid-request', 'forbidden', 'provider-validation-required',
   'storage-error', 'auth-error', 'authorization-pending', 'data-unavailable', 'recovery-error', 'internal-error',
   'transport-error', 'protocol-error']), detail: errorSchema.nullable(),
+  diagnostic: authenticationDiagnosticSchema.optional(),
   cleanup: z.strictObject({ deletion: z.enum(['succeeded', 'failed']), cacheInvalidation: z.enum(['succeeded', 'failed']),
     persistence: z.enum(['succeeded', 'failed']) }).nullable() });
 export type RuntimeFailure = z.infer<typeof failureSchema>;

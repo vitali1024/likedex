@@ -53,6 +53,19 @@ function setup(bodies: unknown[] = [channelResponse(), membershipPage(), videosP
   return { chrome, fetcher, requests, abort, progress, run };
 }
 describe('Human release observation is non-destructive', () => {
+  it('returns safe bootstrap failure diagnostics without acquiring mutation capabilities', async () => {
+    const scan = setup([]);
+    scan.fetcher.mockRejectedValue(new TypeError(`Illegal invocation ${TOKEN_A} secret body`));
+    const result = await scan.run();
+    expect(result).toMatchObject({ status: 'failed', summary: { trustedCompletion: false, pages: 0 },
+      diagnostic: { phase: 'bootstrap-fetch', endpoint: 'youtube.channels.list', httpStatus: null,
+        errorCode: 'fetch-invocation', retryOccurred: false } });
+    expect(scan.fetcher).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(result)).not.toContain(TOKEN_A);
+    expect(JSON.stringify(result)).not.toContain('secret body');
+    expect(resultSchema.safeParse({ ...result, diagnostic: { phase: 'bootstrap-fetch', endpoint: 'youtube.channels.list',
+      httpStatus: null, errorCode: 'fetch-invocation', retryOccurred: false, token: TOKEN_A } }).success).toBe(false);
+  });
   it('consumes authentic provider completion and returns only sanitized aggregates without applying pages', async () => {
     const seenProofs: unknown[] = [];
     const original = YouTubeLikedVideosProvider.prototype.enumerateLikedVideos;
@@ -113,7 +126,7 @@ describe('Human release observation is non-destructive', () => {
   });
   it('hydration transport failure does not treat membership as a successful empty scan', async () => {
     const scan = setup([channelResponse(), membershipPage()]);
-    scan.fetcher.mockRejectedValue(new Error(`raw body ${TOKEN_A}`));
+    scan.fetcher.mockRejectedValue(new TypeError(`raw body ${TOKEN_A}`));
     const result = await scan.run();
     expect(result).toMatchObject({ status: 'failed', summary: { trustedCompletion: false }, error: { category: 'network' } });
     expect(JSON.stringify(result)).not.toContain(TOKEN_A);
