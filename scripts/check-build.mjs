@@ -15,7 +15,8 @@ assert.equal(manifest.manifest_version, 3);
 assert.deepEqual(manifest.permissions, ['sidePanel']);
 assert.equal(manifest.host_permissions, undefined);
 assert.equal(manifest.oauth2, undefined);
-assert.equal(manifest.key, undefined);
+// Exact public release metadata; independent of the build configuration.
+assert.equal(manifest.key, 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2Mrsf7jhzWUVvet1U8+ivTvl7skABNZU3ZmlhBchXJ383YHZqNpQju8IUPfZprfoxlBoma1W9Cf6/T+Pc08PmzJS2P1gtHBQ2dsC0FGVVGPdVoq3BpHfA7sHphlorQ59217U4dEPB7KbUFmePOvC+UtJlc1LgVaLTRh1+9Ifiv32CeuHMMg56hqj3e+5O4aBPAfmhBMMfJ5g0xvE5QeNBIuCGVw1uCyVS9HQaZpKfpKnjgNK9WnbVE1JHYjFC4yF3t5k8/qc/Fo/wcClQu8nhrZBiddjbu8dYa6CfQqyeIlc7gTk8288emrXpOLl1qYwfy1spKCaYcd1f3rqnZEpsQIDAQAB');
 assert.equal(manifest.action.default_title, 'Open Likedex');
 assert.equal(manifest.action.default_popup, undefined);
 assert.deepEqual(manifest.options_ui, { page: 'options.html', open_in_tab: true });

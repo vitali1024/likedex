@@ -1,13 +1,28 @@
 # Likedex Chrome Web Store release checklist
 
-Status: entirely planned, 2026-10-04. No developer resources, Store draft, identity, package, assets, or submission were created during specification. **B-01 is resolved** in [privacy and data](privacy-and-data.md#b-01-resolved-human-decision); release must verify the approved immediate revoke/delete and bounded freshness behavior. Recheck official requirements at execution; external dashboards can change.
+Status: Store draft identity reserved by the human owner, 2026-10-04. Product release, listing/privacy completion and review submission remain planned. No external resources were created during specification. **B-01 is resolved** in [privacy and data](privacy-and-data.md#b-01-resolved-human-decision); release must verify the approved immediate revoke/delete and bounded freshness behavior. Recheck official requirements at execution; external dashboards can change.
+
+## Reserved Chrome Web Store identity
+
+- Product: **Likedex**
+- Store Item ID: `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`
+- Reservation package: **0.1.0**
+- Store state at reservation: **Draft**
+- Stable local-build identity: **Chrome Web Store public key**, normalized as one base64 line and configured directly in `wxt.config.ts` under `manifest.key`.
+- Package accepted successfully; observed item type: **Extension**.
+- Package-level validation errors observed: **none**.
+- Package-level validation warnings observed: **none**.
+
+These reservation observations and the public key were supplied by the human owner. The Store Item ID and public key are public release metadata, not credentials or private signing material. The production build checker compares the emitted key exactly, and the existing Playwright smoke test compares the loaded service-worker extension ID with the Store Item ID.
+
+Version **0.1.0 has already been uploaded to this Store item**. The **next package uploaded to the same listing must use an extension version greater than 0.1.0**. This identity integration keeps the current package/extension version at 0.1.0 and uploads no package; the eventual release phase will deliberately choose the next version. Draft reservation is not review submission or publication.
 
 ## Deadline-controlled: early identity reservation (Phase 11A)
 
 - [ ] Human verifies developer account registration, required account security/contact/payment steps, access rights, and ability to create a new item. Record a real blocker if unavailable; do not invent account readiness.
-- [ ] After specification commit and Phase 1, build the minimal real MV3 shell and package it for a **draft** Likedex item. No fake library or production-readiness claim.
-- [ ] Human creates/uploads the draft item without submitting it for review yet; record actual item URL and ID.
-- [ ] Obtain the item's public extension key; configure the build's manifest `key` strategy so unpacked production-like builds have the Store ID. Compare the Chrome extensions page ID to the dashboard item ID.
+- [x] After specification commit and Phase 1, build the minimal real MV3 shell and package it for a **draft** Likedex item. Reservation package 0.1.0 was accepted, as reported by the human owner; no production-readiness claim.
+- [x] Human creates/uploads the draft item without submitting it for review yet; reserved item ID is recorded above. No public listing URL was supplied.
+- [x] Obtain the item's public extension key and configure `manifest.key` so unpacked builds have the Store ID. The real-extension Playwright smoke asserts the actual loaded ID against the reserved ID.
 - [ ] Preserve the same Store identity for all release candidates. Never store a signing private key in source or distribute it.
 - [ ] Configure the production **Chrome Extension** OAuth client using the stable item ID, then continue Phase 3 authentication integration. Record nonsecret configuration provenance, not credentials.
 
@@ -15,7 +30,7 @@ This sequence follows Chrome's [OAuth identity setup guide](https://developer.ch
 
 ## Deadline-controlled: manifest, version, and permissions
 
-- [ ] Product/listing name is Likedex. Initial submitted release convention is `0.1.0`, then strictly increasing valid numeric Chrome package versions; never submit `0.0.0`.
+- [ ] Product/listing name is Likedex. Reservation version `0.1.0` is already uploaded; every subsequent Store upload must use a strictly higher valid numeric Chrome package version. Never submit `0.0.0`.
 - [ ] Generated production manifest has MV3 service worker, Options entry, explicit toolbar `action`, Side Panel default path and `sidePanel` permission, correct OAuth client/scope, stable identity strategy, and valid icons. Configure action-click panel behavior and omit an action popup.
 - [ ] Pick/document minimum Chrome version based on actual used APIs and smoke testing, not an arbitrary compatibility claim.
 - [ ] Inspect packaged CSP/code: bundled executable code only; no remote code, development server, source secrets, or fixture switches.

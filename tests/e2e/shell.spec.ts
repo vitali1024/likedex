@@ -1,3 +1,4 @@
+import console from 'node:console';
 import { resolve } from 'node:path';
 import { chromium, expect, test } from '@playwright/test';
 import type { browser } from 'wxt/browser';
@@ -12,7 +13,10 @@ test('Phase 1 production extension loads worker and both shells', async () => {
 
   try {
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
-    const origin = `chrome-extension://${new URL(worker.url()).hostname}`;
+    const actualLoadedExtensionId = new URL(worker.url()).hostname;
+    expect(actualLoadedExtensionId).toBe('mmefiakgfhddiojfdnkfpfpbkgbfgkgj');
+    console.log(`Loaded production extension ID: ${actualLoadedExtensionId}`);
+    const origin = `chrome-extension://${actualLoadedExtensionId}`;
     const page = await context.newPage();
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));

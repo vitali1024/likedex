@@ -29,7 +29,7 @@ On Linux CI, install browser system dependencies with `npx playwright install --
 | `npm run test:e2e` | Load the existing production build in isolated Playwright Chromium; check worker, both page mounts and panel behavior configuration |
 | `npm run verify` | Lint → types → unit tests → build → artifact checks → browser shell smoke |
 
-The browser smoke requires `npm run build` first when run alone. It tests real extension page mounting and API configuration; it does **not** exercise native Chrome toolbar clicking. For that manual check, load `.output/chrome-mv3` unpacked through `chrome://extensions`, open Options from the extension menu, pin Likedex, and click its toolbar icon to open the Side Panel. No stable Store identity is configured yet; an unpacked ID is not the production identity.
+The browser smoke requires `npm run build` first when run alone. It tests real extension page mounting, API configuration and the loaded extension ID; it does **not** exercise native Chrome toolbar clicking. For that manual check, load `.output/chrome-mv3` unpacked through `chrome://extensions`, open Options from the extension menu, pin Likedex, and click its toolbar icon to open the Side Panel. The Store public key in `wxt.config.ts` pins unpacked builds to the reserved ID `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`.
 
 TypeScript inherits WXT's `skipLibCheck` for dependency declaration compatibility; strict checking remains enabled for project source, configuration and tests. ESLint 9 and TypeScript 5.9 are intentionally pinned within the lint plugins' supported peer ranges; npm reports ESLint 9's upstream support deprecation. Browser execution may need permission to spawn Chromium in a restricted agent sandbox. A blocked browser launch fails verification and is never treated as a passing smoke test.
 
@@ -37,7 +37,7 @@ Production composition lives in `entrypoints/` and `src/`. Tests live exclusivel
 
 The original foundation icons are a white L on a dark square, checked in at 16, 32, 48 and 128 pixels. Regenerate them with `node scripts/generate-icons.mjs`. Final Store assets and exact-package smoke testing belong to later release work.
 
-After human review of Phase 1, the next external step is a Chrome Web Store **draft** upload to reserve a stable Likedex extension identity (Phase 11A), before production Chrome Extension OAuth configuration. No Store or OAuth resources are created by this scaffold.
+The human owner completed the Chrome Web Store **draft** reservation with version **0.1.0**; [release documentation](docs/release/chrome-web-store.md#reserved-chrome-web-store-identity) records the reserved identity. The next upload to this listing must use a version greater than 0.1.0; this identity task does not bump the current version. Production Chrome Extension OAuth setup remains future work. After human review/commit of the identity integration, the next implementation phase is Phase 2 — domain models/contracts/storage; it has not started.
 
 ## Documentation
 

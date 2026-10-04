@@ -4,10 +4,12 @@ Status: planned, 2026-10-04. No Cloud project/client, consent configuration, tes
 
 ## Deadline-controlled: early production identity
 
-- [ ] Complete Phase 11A's [Store draft/stable identity sequence](chrome-web-store.md) before final auth integration.
+The Chrome extension identity prerequisite is resolved: the human owner reserved the Likedex Store draft as `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`, and its public key is configured in the WXT manifest. The future Google OAuth client of type **Chrome Extension must target exactly `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`**. The existing real-extension smoke checks the loaded production extension ID. This resolves only the identity prerequisite; Google Cloud setup, OAuth client creation/configuration and authentication implementation remain unfinished.
+
+- [x] Reserve the Store draft and pin stable local-build identity, the identity portion of Phase 11A's [sequence](chrome-web-store.md), before final auth integration.
 - [ ] Human creates or designates the Likedex Google Cloud project, enables YouTube Data API, and confirms ownership/contact/quota access. Record actual nonsecret project identifiers when available.
 - [ ] Configure branding as **Likedex** with real support/developer contacts, homepage, privacy policy and required domain ownership; disclose bounded retention and the approved revoke/delete controls.
-- [ ] Create production OAuth client of type **Chrome Extension**, bound to the actual stable Store extension ID. Configure manifest OAuth client ID and required scope; compare unpacked and Store item IDs. Follow [Chrome OAuth setup](https://developer.chrome.com/docs/extensions/how-to/integrate/oauth).
+- [ ] Create production OAuth client of type **Chrome Extension**, bound to `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`. Configure manifest OAuth client ID and required scope in the future authentication phase; preserve the unpacked/Store ID match. Follow [Chrome OAuth setup](https://developer.chrome.com/docs/extensions/how-to/integrate/oauth).
 - [ ] Never substitute a temporary extension ID and call final production wiring complete. No server client secret, refresh-token store, or service account is required by this product design.
 
 ## Scope and consent
