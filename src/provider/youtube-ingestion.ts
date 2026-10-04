@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { GoogleAuthorizationRequests } from '../auth/google-requests';
+import type { GoogleAuthorizationRequests, YouTubeReadSession } from '../auth/google-requests';
 import { authenticatedBootstrapSchema } from '../domain/authentication';
 import { videoSchema, type Freshness, type MirroredVideo } from '../domain/contracts';
 import { retentionDeadline } from '../domain/freshness';
@@ -21,6 +21,7 @@ export interface ProviderProgress {
 export interface ProviderPage {
   kind: 'page';
   pageNumber: number;
+  terminal: boolean;
   records: MirroredVideo[];
   progress: ProviderProgress;
 }
@@ -101,12 +102,13 @@ export class YouTubeLikedVideosProvider {
 
   // A page authorizes only prospective safe updates. Returning early, aborting,
   // or any failure leaves the caller without a terminal completeness capability.
-  async *enumerateLikedVideos(input: IngestionContext, signal: AbortSignal): AsyncGenerator<ProviderEvent, void, void> {
+  async *enumerateLikedVideos(input: IngestionContext, signal: AbortSignal,
+    sharedSession?: YouTubeReadSession): AsyncGenerator<ProviderEvent, void, void> {
     try {
       const parsed = contextSchema.safeParse(input);
       if (!parsed.success) throw new ProviderError('invalid-context');
       const context = parsed.data;
-      const session = this.requests.createYouTubeReadSession(context.owner, signal);
+      const session = sharedSession ?? this.requests.createYouTubeReadSession(context.owner, signal);
       const tokens = new Set<string>();
       const sources = new Set<string>();
       const canonical = new Map<string, { member: Membership; sourceIds: string[]; observedAt: string }>();
@@ -154,7 +156,7 @@ export class YouTubeLikedVideosProvider {
         const progress: ProviderProgress = { pagesAccepted: pages, rawItems, uniqueMembership: canonical.size,
           duplicateVideoItems: rawItems - canonical.size, estimatedTotal: total };
         chain.push({ pageNumber: pages, rawItems: page.memberships.length, observedAt: membershipAt, terminal });
-        yield { kind: 'page', pageNumber: pages, records, progress: { ...progress } };
+        yield { kind: 'page', pageNumber: pages, terminal, records, progress: { ...progress } };
         // Includes time spent while the consumer applies this page; it cannot
         // turn a paused/cancelled stream into a completed scan.
         session.assertActive();

@@ -132,6 +132,8 @@ export const attemptSchema = z.strictObject({
   rawItems: counter,
   uniqueMembership: counter,
   safeCommits: counter,
+  addedCount: counter.default(0),
+  updatedCount: counter.default(0),
   retrying: z.boolean(),
   estimatedTotal: counter.nullable(),
   error: errorSchema.nullable(),

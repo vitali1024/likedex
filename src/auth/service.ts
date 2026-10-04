@@ -90,6 +90,18 @@ export class AuthenticationService {
   // Required new-session/periodic check. Its caller owns lifecycle invocation.
   validateAuthorization(): Promise<BootstrapResult> { return this.check(false); }
 
+  // Sync's shared request session already exhausted the approved recovery
+  // budget. Apply existing teardown policy without another authorization call.
+  async cleanupSyncAuthorization(failure: AuthenticationError,
+    expected: Pick<ControlFence, 'dataGeneration' | 'authEpoch'>): Promise<AuthorizationCleanupResult> {
+    this.validated = null;
+    const control = await this.repository.readControl();
+    if (!this.sameContext(expected, control)) throw new AuthenticationError('cancelled');
+    const reason = ['auth-required', 'permission-denied'].includes(failure.code)
+      ? 'authorization-invalid' : 'authorization-unverified';
+    return this.cleanupAuthorization(reason, control);
+  }
+
   private async check(interactive: boolean): Promise<BootstrapResult> {
     return this.safe(async () => {
       if (this.blocked) throw new AuthenticationError('storage');

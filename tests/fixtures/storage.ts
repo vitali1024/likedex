@@ -17,7 +17,7 @@ export function attempt(overrides: Partial<SyncAttempt> = {}): SyncAttempt {
     attemptId: ATTEMPT_ID, requestId: '00000000-0000-4000-8000-000000000003', ownerChannelId: 'owner-a',
     dataGeneration: 0, authEpoch: 0, workerInstanceId: '00000000-0000-4000-8000-000000000004',
     state: 'scanning', startedAt: OBSERVED, updatedAt: OBSERVED, finishedAt: null,
-    pagesAccepted: 0, rawItems: 0, uniqueMembership: 0, safeCommits: 0, retrying: false,
+    pagesAccepted: 0, rawItems: 0, uniqueMembership: 0, safeCommits: 0, addedCount: 0, updatedCount: 0, retrying: false,
     estimatedTotal: null, error: null, completionEvidence: null, freshness: freshness(), ...overrides,
   };
 }

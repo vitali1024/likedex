@@ -47,6 +47,7 @@ export interface RevocationOutcome {
 
 interface RequestBudget {
   startedAt: number;
+  lastSeenAt: number;
   retries: number;
   recovered: boolean;
 }
@@ -57,6 +58,22 @@ export interface YouTubeReadSession {
   videos<T>(videoIds: readonly string[], validate: (value: unknown) => T): Promise<T>;
   assertActive(): void;
   observedAt(): string;
+}
+export interface SyncRequestScope { attemptId: string; dataGeneration: number; authEpoch: number }
+declare const ownerVerificationBrand: unique symbol;
+export interface VerifiedSyncOwner {
+  readonly [ownerVerificationBrand]: true;
+  readonly scope: Readonly<SyncRequestScope>;
+  readonly owner: Readonly<AuthenticatedYouTubeBootstrap>;
+  readonly observedAt: string;
+  readonly checkNumber: number;
+}
+const ownerVerifications = new WeakSet<object>();
+export function isVerifiedSyncOwner(value: unknown): value is VerifiedSyncOwner {
+  return typeof value === 'object' && value !== null && ownerVerifications.has(value);
+}
+export interface YouTubeSyncSession extends YouTubeReadSession {
+  verifyOwner(): Promise<VerifiedSyncOwner>;
 }
 
 export class GoogleAuthorizationRequests {
@@ -95,8 +112,10 @@ export class GoogleAuthorizationRequests {
 
   private assertBudget(budget: RequestBudget, signal: AbortSignal): void {
     assertNotAborted(signal);
-    const elapsed = this.timing.now() - budget.startedAt;
-    if (!Number.isFinite(elapsed) || elapsed < 0 || elapsed >= 600_000) throw new AuthenticationError('request-budget');
+    const now = this.timing.now();
+    const elapsed = now - budget.startedAt;
+    if (!Number.isFinite(elapsed) || now < budget.lastSeenAt || elapsed < 0 || elapsed >= 600_000) throw new AuthenticationError('request-budget');
+    budget.lastSeenAt = now;
   }
 
   private async jsonRequest(token: string, url: string, signal: AbortSignal,
@@ -186,8 +205,26 @@ export class GoogleAuthorizationRequests {
   connectExplicitly(signal: AbortSignal): Promise<AuthenticatedYouTubeBootstrap> { return this.bootstrap(true, signal); }
 
   createYouTubeReadSession(expected: AuthenticatedYouTubeBootstrap, signal: AbortSignal): YouTubeReadSession {
-    const owner = authenticatedBootstrapSchema.parse(expected);
-    const budget: RequestBudget = { startedAt: this.timing.now(), retries: 0, recovered: false };
+    return this.createReadSession(authenticatedBootstrapSchema.parse(expected), signal);
+  }
+
+  createYouTubeSyncSession(scope: SyncRequestScope, signal: AbortSignal, startedAt: string): YouTubeSyncSession {
+    const checked = z.strictObject({ attemptId: z.uuid(), dataGeneration: z.number().int().nonnegative(),
+      authEpoch: z.number().int().nonnegative() }).parse(scope);
+    return this.createReadSession(null, signal, checked, Date.parse(startedAt));
+  }
+
+  private createReadSession(expected: AuthenticatedYouTubeBootstrap | null, signal: AbortSignal,
+    scope?: SyncRequestScope, startedAt = this.timing.now()): YouTubeSyncSession {
+    let owner = expected;
+    let ownerChecks = 0;
+    const budget: RequestBudget = { startedAt, lastSeenAt: startedAt, retries: 0, recovered: false };
+    const matchOwner = (candidate: AuthenticatedYouTubeBootstrap) => {
+      if (owner !== null && (candidate.channelId !== owner.channelId || candidate.likesPlaylistId !== owner.likesPlaylistId)) {
+        throw new AuthenticationError('owner-mismatch');
+      }
+      owner = candidate;
+    };
     const read = async <T>(url: string, validate: (body: unknown) => T): Promise<T> => {
       this.assertBudget(budget, signal);
       const retries = { count: 0 };
@@ -195,15 +232,28 @@ export class GoogleAuthorizationRequests {
         (token) => this.jsonRequest(token, url, signal, 'malformed-provider', budget, retries), budget,
         async (token) => {
           const replacement = await this.bootstrapRequest(token, signal, budget);
-          if (replacement.channelId !== owner.channelId || replacement.likesPlaylistId !== owner.likesPlaylistId) {
-            throw new AuthenticationError('owner-mismatch');
-          }
+          matchOwner(replacement);
         });
       this.assertBudget(budget, signal);
       return validate(body);
     };
     return {
+      verifyOwner: async () => {
+        if (scope === undefined) throw new AuthenticationError('unexpected');
+        this.assertBudget(budget, signal);
+        const retries = { count: 0 };
+        const candidate = await this.authenticated(false, signal,
+          (token) => this.bootstrapRequest(token, signal, budget, retries), budget);
+        this.assertBudget(budget, signal);
+        matchOwner(candidate);
+        const verification = Object.freeze({ scope: Object.freeze({ ...scope }),
+          owner: Object.freeze({ ...candidate }), observedAt: new Date(this.timing.now()).toISOString(),
+          checkNumber: ++ownerChecks }) as VerifiedSyncOwner;
+        ownerVerifications.add(verification);
+        return verification;
+      },
       playlistItems: (pageToken, validate) => {
+        if (owner === null) throw new AuthenticationError('identity-missing');
         if (pageToken !== undefined && pageToken.length === 0) throw new AuthenticationError('malformed-provider');
         const params = new URLSearchParams({ part: 'id,snippet,contentDetails,status', maxResults: '50', playlistId: owner.likesPlaylistId });
         if (pageToken !== undefined) params.set('pageToken', pageToken);

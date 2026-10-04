@@ -6,6 +6,10 @@ import {
   type MirroredVideo, type RemoteOwner, type SyncAttempt, type SyncMetadata, type WriteFence,
 } from '../domain/contracts';
 import { LikedexDatabase, SINGLETON_KEY } from './database';
+import { isTrustedProviderCompletion, type ProviderPage } from '../provider/youtube-ingestion';
+import { isVerifiedSyncOwner, type VerifiedSyncOwner } from '../auth/google-requests';
+import { attemptOutcome, canTransition, derivedFreshness, mergeObservedVideo } from '../domain/synchronization';
+import type { DomainError } from '../domain/contracts';
 
 export type StorageErrorCode = 'persistence' | 'invalid-input' | 'invalid-data' | 'stale-write'
   | 'owner-mismatch' | 'attempt-mismatch' | 'cleanup-pending' | 'expired' | 'clock-unverified';
@@ -270,6 +274,198 @@ export class LibraryRepository {
       if (videos.length > 0) sync.lastMirrorChangeRevision = revision;
       await this.db.sync.put(sync, SINGLETON_KEY);
     });
+  }
+
+  // Claim within one transaction. A simultaneous loser observes the durable
+  // winner, including when another service instance owns the running task.
+  async claimSyncAttempt(value: Pick<SyncAttempt, 'attemptId' | 'requestId' | 'workerInstanceId'>,
+    now: string): Promise<{ status: 'started' | 'already-active'; snapshot: LibrarySnapshot }> {
+    parse(z.strictObject({ attemptId: attemptSchema.shape.attemptId, requestId: attemptSchema.shape.requestId,
+      workerInstanceId: attemptSchema.shape.workerInstanceId }), value, 'invalid-input');
+    return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
+      const snapshot = await this.state();
+      this.assertEligible(snapshot, now);
+      if (snapshot.control.connectionGate !== 'connected') throw new StorageError('invalid-input');
+      if (snapshot.sync?.currentAttempt && isActiveAttempt(snapshot.sync.currentAttempt.state)) {
+        return { status: 'already-active', snapshot };
+      }
+      const sync = snapshot.sync ?? emptySync();
+      sync.previousCompletedResult = sync.currentAttempt;
+      sync.currentAttempt = parse(attemptSchema, { ...value, ownerChannelId: snapshot.owner?.channelId ?? null,
+        dataGeneration: snapshot.control.dataGeneration, authEpoch: snapshot.control.authEpoch,
+        state: 'preparing', startedAt: now, updatedAt: now, finishedAt: null,
+        pagesAccepted: 0, rawItems: 0, uniqueMembership: 0, safeCommits: 0, addedCount: 0, updatedCount: 0,
+        retrying: false, estimatedTotal: null, error: null, completionEvidence: null,
+        freshness: derivedFreshness(now, retainedFreshness(snapshot.owner, snapshot.videos, snapshot.sync)) }, 'invalid-input');
+      await this.db.sync.put(sync, SINGLETON_KEY);
+      await this.db.control.put({ ...snapshot.control, revision: increment(snapshot.control.revision),
+        lastClockSeenAt: now }, SINGLETON_KEY);
+      return { status: 'started', snapshot: await this.state() };
+    }));
+  }
+
+  private activeAttempt(snapshot: LibrarySnapshot): SyncAttempt {
+    const attempt = snapshot.sync?.currentAttempt;
+    if (!attempt || !isActiveAttempt(attempt.state)) throw new StorageError('attempt-mismatch');
+    this.assertAttempt(attempt, snapshot);
+    if (snapshot.control.connectionGate !== 'connected') throw new StorageError('stale-write');
+    return attempt;
+  }
+
+  private assertVerifiedOwner(verification: unknown, snapshot: LibrarySnapshot): asserts verification is VerifiedSyncOwner {
+    if (!isVerifiedSyncOwner(verification)) throw new StorageError('invalid-input');
+    const attempt = this.activeAttempt(snapshot);
+    if (verification.scope.attemptId !== attempt.attemptId) throw new StorageError('attempt-mismatch');
+    if (verification.scope.dataGeneration !== attempt.dataGeneration || verification.scope.authEpoch !== attempt.authEpoch) {
+      throw new StorageError('stale-write');
+    }
+    if (snapshot.owner && (verification.owner.channelId !== snapshot.owner.channelId
+      || verification.owner.likesPlaylistId !== snapshot.owner.likesPlaylistId)) throw new StorageError('owner-mismatch');
+  }
+
+  async bindSyncOwner(verification: VerifiedSyncOwner, expected: WriteFence, now: string): Promise<LibrarySnapshot> {
+    return this.mutate(expected, now, async (snapshot) => {
+      this.assertVerifiedOwner(verification, snapshot);
+      const attempt = this.activeAttempt(snapshot);
+      if (attempt.state !== 'preparing' || verification.checkNumber !== 1 || verification.observedAt > now) throw new StorageError('invalid-input');
+      await this.db.owner.put(parse(ownerSchema, { channelId: verification.owner.channelId,
+        likesPlaylistId: verification.owner.likesPlaylistId, displayName: verification.owner.channelTitle ?? null,
+        verifiedAt: verification.observedAt,
+        freshness: derivedFreshness(verification.observedAt, []) }, 'invalid-input'), SINGLETON_KEY);
+      snapshot.sync!.currentAttempt = { ...attempt, ownerChannelId: verification.owner.channelId, updatedAt: now };
+      await this.db.sync.put(snapshot.sync!, SINGLETON_KEY);
+    });
+  }
+
+  async transitionSyncAttempt(state: 'scanning' | 'applying' | 'finalizing', expected: WriteFence,
+    now: string): Promise<LibrarySnapshot> {
+    return this.mutate(expected, now, async (snapshot) => {
+      const attempt = this.activeAttempt(snapshot);
+      if (!canTransition(attempt.state, state)) throw new StorageError('invalid-input');
+      snapshot.sync!.currentAttempt = parse(attemptSchema, { ...attempt, state, updatedAt: now }, 'invalid-input');
+      await this.db.sync.put(snapshot.sync!, SINGLETON_KEY);
+    });
+  }
+
+  async applyProviderPage(value: ProviderPage, expected: WriteFence, now: string): Promise<LibrarySnapshot> {
+    const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+    const page = parse(z.strictObject({ kind: z.literal('page'), pageNumber: count, terminal: z.boolean(),
+      records: z.array(videoSchema), progress: z.strictObject({ pagesAccepted: count, rawItems: count,
+        uniqueMembership: count, duplicateVideoItems: count, estimatedTotal: count.nullable() }) }), value, 'invalid-input');
+    return this.mutate(expected, now, async (snapshot, revision) => {
+      const attempt = this.activeAttempt(snapshot);
+      if (attempt.state !== 'applying' || page.pageNumber !== attempt.pagesAccepted + 1
+        || page.progress.pagesAccepted !== page.pageNumber || page.progress.rawItems < attempt.rawItems
+        || page.progress.uniqueMembership < attempt.uniqueMembership
+        || page.progress.duplicateVideoItems !== page.progress.rawItems - page.progress.uniqueMembership
+        || new Set(page.records.map((record) => record.videoId)).size !== page.records.length) {
+        throw new StorageError('invalid-input');
+      }
+      const existing = new Map(snapshot.videos.map((record) => [record.videoId, record]));
+      let addedCount = attempt.addedCount;
+      let updatedCount = attempt.updatedCount;
+      const records = page.records.map((incoming) => {
+        if (incoming.ownerChannelId !== snapshot.owner?.channelId) throw new StorageError('owner-mismatch');
+        if (incoming.lastSeenAttemptId !== attempt.attemptId) throw new StorageError('attempt-mismatch');
+        const previous = existing.get(incoming.videoId);
+        if (!previous) addedCount++;
+        else if (previous.lastSeenAttemptId !== attempt.attemptId) updatedCount++;
+        return mergeObservedVideo(previous, incoming);
+      });
+      const seen = new Set(snapshot.videos.filter((record) => record.lastSeenAttemptId === attempt.attemptId).map((record) => record.videoId));
+      for (const record of records) seen.add(record.videoId);
+      if (seen.size !== page.progress.uniqueMembership) throw new StorageError('invalid-input');
+      const checkpoint = parse(attemptSchema, { ...attempt, pagesAccepted: page.progress.pagesAccepted,
+        rawItems: page.progress.rawItems, uniqueMembership: page.progress.uniqueMembership,
+        estimatedTotal: page.progress.estimatedTotal, safeCommits: attempt.safeCommits + 1,
+        addedCount, updatedCount, updatedAt: now }, 'invalid-input');
+      await this.db.videos.bulkPut(records);
+      snapshot.sync!.currentAttempt = checkpoint;
+      if (records.length > 0) snapshot.sync!.lastMirrorChangeRevision = revision;
+      await this.db.sync.put(snapshot.sync!, SINGLETON_KEY);
+    });
+  }
+
+  async finishSyncAttempt(error: DomainError, expected: WriteFence, now: string): Promise<LibrarySnapshot> {
+    return this.mutate(expected, now, async (snapshot) => {
+      const attempt = this.activeAttempt(snapshot);
+      const state = attemptOutcome(attempt, error);
+      if (!canTransition(attempt.state, state)) throw new StorageError('invalid-input');
+      snapshot.sync!.currentAttempt = parse(attemptSchema, { ...attempt, state,
+        updatedAt: now, finishedAt: now, retrying: false, error, completionEvidence: null }, 'invalid-input');
+      await this.db.sync.put(snapshot.sync!, SINGLETON_KEY);
+    });
+  }
+
+  // The sole membership-pruning transaction. Reject provenance before reading
+  // the database; summaries, booleans and JSON can never enter this boundary.
+  async finalizeTrustedEnumeration(proof: unknown, expected: WriteFence, now: string,
+    finalOwner?: VerifiedSyncOwner): Promise<LibrarySnapshot> {
+    if (!isTrustedProviderCompletion(proof)) throw new StorageError('invalid-input');
+    return this.mutate(expected, now, async (snapshot, revision) => {
+      this.assertVerifiedOwner(finalOwner, snapshot);
+      const attempt = this.activeAttempt(snapshot);
+      if (attempt.state !== 'finalizing') throw new StorageError('attempt-mismatch');
+      if (proof.scope.attemptId !== attempt.attemptId) throw new StorageError('attempt-mismatch');
+      if (proof.scope.dataGeneration !== attempt.dataGeneration || proof.scope.authEpoch !== attempt.authEpoch) {
+        throw new StorageError('stale-write');
+      }
+      if (proof.scope.ownerChannelId !== snapshot.owner?.channelId || proof.scope.likesPlaylistId !== snapshot.owner.likesPlaylistId) {
+        throw new StorageError('owner-mismatch');
+      }
+      if (finalOwner.checkNumber < 2 || finalOwner.observedAt < proof.terminalPageObservedAt || finalOwner.observedAt > now
+        || attempt.pagesAccepted !== proof.progress.pagesAccepted || attempt.safeCommits !== attempt.pagesAccepted
+        || attempt.rawItems !== proof.progress.rawItems || attempt.uniqueMembership !== proof.progress.uniqueMembership) {
+        throw new StorageError('invalid-input');
+      }
+      const seen = new Set(proof.membershipVideoIds);
+      const committed = snapshot.videos.filter((record) => record.lastSeenAttemptId === attempt.attemptId);
+      if (committed.length !== seen.size || committed.some((record) => !seen.has(record.videoId))) {
+        throw new StorageError('invalid-input');
+      }
+      const remaining = snapshot.videos.filter((record) => seen.has(record.videoId));
+      const removed = snapshot.videos.filter((record) => !seen.has(record.videoId));
+      const owner = parse(ownerSchema, { channelId: finalOwner.owner.channelId,
+        likesPlaylistId: finalOwner.owner.likesPlaylistId, displayName: finalOwner.owner.channelTitle ?? null,
+        verifiedAt: finalOwner.observedAt, freshness: derivedFreshness(finalOwner.observedAt, []) }, 'invalid-input');
+      const freshness = derivedFreshness(proof.terminalPageObservedAt, retainedFreshness(owner, remaining, null));
+      const success = parse(latestSuccessSchema, { attemptId: attempt.attemptId, ownerChannelId: owner.channelId,
+        dataGeneration: attempt.dataGeneration, startedAt: attempt.startedAt, completedAt: now,
+        pageCount: proof.progress.pagesAccepted, rawRemoteCount: proof.progress.rawItems,
+        uniqueRemoteCount: proof.progress.uniqueMembership, localMembershipCount: remaining.length,
+        localAvailableCount: remaining.filter((record) => record.availability.state === 'available').length,
+        addedCount: attempt.addedCount, updatedCount: attempt.updatedCount, removedCount: removed.length,
+        freshness }, 'invalid-input');
+      const sync = snapshot.sync!;
+      sync.currentAttempt = parse(attemptSchema, { ...attempt, state: 'success', updatedAt: now, finishedAt: now,
+        retrying: false, error: null, freshness, completionEvidence: { validatorRevision: proof.validatorRevision,
+          acceptedPages: proof.progress.pagesAccepted, rawItems: proof.progress.rawItems,
+          uniqueMembership: proof.progress.uniqueMembership, terminalPageObservedAt: proof.terminalPageObservedAt } }, 'invalid-input');
+      sync.latestSuccessfulSync = success;
+      sync.lastMirrorChangeRevision = revision;
+      sync.lastFinalizedMirrorRevision = revision;
+      await this.db.videos.bulkDelete(removed.map((record) => record.videoId));
+      await this.db.owner.put(owner, SINGLETON_KEY);
+      await this.db.sync.put(sync, SINGLETON_KEY);
+    });
+  }
+
+  async recoverSyncInterruption(workerInstanceId: string, now: string): Promise<LibrarySnapshot> {
+    parse(z.uuid(), workerInstanceId, 'invalid-input');
+    await this.enforceRetention(now);
+    return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
+      const snapshot = await this.state();
+      this.assertEligible(snapshot, now);
+      const attempt = snapshot.sync?.currentAttempt;
+      if (!attempt || !isActiveAttempt(attempt.state) || attempt.workerInstanceId === workerInstanceId) return snapshot;
+      snapshot.sync!.currentAttempt = parse(attemptSchema, { ...attempt, state: 'interrupted',
+        updatedAt: now, finishedAt: now, retrying: false,
+        error: { category: 'interrupted', messageKey: 'worker-interrupted', phase: attempt.state },
+        completionEvidence: null }, 'invalid-input');
+      await this.db.sync.put(snapshot.sync!, SINGLETON_KEY);
+      await this.db.control.put({ ...snapshot.control, revision: increment(snapshot.control.revision), lastClockSeenAt: now }, SINGLETON_KEY);
+      return this.state();
+    }));
   }
 
   async clearLocalData(expected: ControlFence): Promise<ControlState> {
