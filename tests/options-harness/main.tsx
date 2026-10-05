@@ -13,23 +13,46 @@ import { attempt, OBSERVED } from '../fixtures/storage';
 export interface OptionsTestControl {
   calls: RuntimeOperation[];
   change(mode: string, count?: number): void;
+  holdReads(operations?: RuntimeOperation[]): void;
+  releaseReads(): void;
+  pendingReads(): number;
+  progress(page: number, phase: 'scanning' | 'applying'): void;
+  invalidate(boundary: 'generation' | 'epoch', broadcast?: boolean): void;
 }
 let mode = new URL(location.href).searchParams.get('mode') ?? 'library';
 let snapshot = optionsSnapshot();
 let revision = 1;
 const listeners = new Set<(event: unknown) => void>();
 const calls: RuntimeOperation[] = [];
+let pending: (() => void)[] = [];
+let holding = new Set<RuntimeOperation>();
+const notify = () => listeners.forEach((listener) => listener({ protocolVersion: 1, event: 'STATE_REVISION',
+  revision: snapshot.revision = ++revision, dataGeneration: snapshot.dataGeneration, authEpoch: snapshot.authEpoch }));
 const control: OptionsTestControl = { calls, change(next, count) {
   mode = next;
   if (count !== undefined) snapshot = optionsSnapshot(count);
-  snapshot.revision = ++revision;
-  listeners.forEach((listener) => listener({ protocolVersion: 1, event: 'STATE_REVISION', revision, dataGeneration: 0, authEpoch: 0 }));
+  notify();
+}, holdReads(operations = ['AUTH_STATUS_GET', 'LIBRARY_SNAPSHOT_GET']) { holding = new Set(operations); }, releaseReads() {
+  holding.clear(); const waiting = pending; pending = []; waiting.forEach((resolve) => resolve());
+}, pendingReads() { return pending.length; }, progress(page, phase) {
+  mode = 'progress';
+  snapshot.sync!.currentAttempt = attempt({ state: phase, pagesAccepted: page, rawItems: page * 50,
+    uniqueMembership: page * 50, safeCommits: page, authEpoch: snapshot.authEpoch, dataGeneration: snapshot.dataGeneration });
+  notify();
+}, invalidate(boundary, broadcast = true) {
+  if (boundary === 'generation') snapshot.dataGeneration++;
+  else snapshot.authEpoch++;
+  mode = 'connected-empty'; snapshot.owner = null; snapshot.videos = []; snapshot.sync = null;
+  if (broadcast) notify(); else snapshot.revision = ++revision;
 } };
 (window as unknown as { optionsTest: OptionsTestControl }).optionsTest = control;
 const client = new RuntimeClient({
   subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
   async send(request) {
     calls.push(request.operation);
+    if (holding.has(request.operation)) {
+      await new Promise<void>((resolve) => pending.push(resolve));
+    }
     const response = (result: unknown) => ({ protocolVersion: 1, requestId: request.requestId, operation: request.operation, ok: true, result });
     const rejected = (code: Parameters<typeof failure>[0], detail: Parameters<typeof failure>[1] = null) => ({ protocolVersion: 1,
       requestId: request.requestId, operation: request.operation, ok: false, error: failure(code, detail) });
@@ -40,6 +63,8 @@ const client = new RuntimeClient({
       mode = 'connected-empty';
       const auth = optionsAuth();
       auth.control.revision = revision;
+      auth.control.dataGeneration = snapshot.dataGeneration;
+      auth.control.authEpoch = snapshot.authEpoch;
       const { control: ignored, ...result } = auth; void ignored;
       return response(result);
     }
@@ -47,6 +72,9 @@ const client = new RuntimeClient({
       if (mode === 'auth-error') return rejected('transport-error');
       const auth = optionsAuth();
       auth.control.revision = revision;
+      auth.control.dataGeneration = snapshot.dataGeneration;
+      auth.control.authEpoch = snapshot.authEpoch;
+      if (mode === 'auth-pending') return response({ status: 'validation-pending', control: auth.control });
       if (mode === 'disconnected' || mode === 'connect-failure') return response({ status: 'auth-required', control: { ...auth.control, connectionGate: 'disconnected' } });
       if (mode === 'mismatch') return response({ status: 'owner-mismatch', control: auth.control,
         bootstrap: { channelId: 'owner-b', channelTitle: 'Different channel', likesPlaylistId: 'likes-owner-b' }, localOwnerChannelId: 'owner-a' });

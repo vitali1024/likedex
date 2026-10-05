@@ -29,6 +29,49 @@ async function seed(): Promise<void> {
 }
 
 describe('Phase 2 local repository (AC-STORAGE-001–005 storage portions)', () => {
+  it('isolates false clock rollback from an older retention timestamp across its control-read await', async () => {
+    await seed();
+    const original = repository.readControl.bind(repository);
+    vi.spyOn(repository, 'readControl').mockImplementationOnce(async () => {
+      const control = await original();
+      await repository.readSnapshot('2026-10-04T12:00:00.001Z');
+      return control;
+    });
+    await expect(repository.enforceRetention(NOW)).rejects.toMatchObject({ code: 'clock-unverified' });
+    expect(await db.videos.count()).toBe(2);
+  });
+  it('samples retention time after overlapping reads without renewing data or suppressing a real rollback', async () => {
+    await seed();
+    let now = NOW;
+    const original = repository.readControl.bind(repository);
+    vi.spyOn(repository, 'readControl').mockImplementationOnce(async () => {
+      const control = await original();
+      now = '2026-10-04T12:00:00.001Z';
+      await repository.readSnapshot(() => now);
+      return control;
+    });
+    expect(await repository.enforceRetention(() => now)).toBe('unchanged');
+    const after = await repository.readSnapshot(() => now);
+    expect(after.videos).toEqual(snapshot.videos);
+    expect(after.earliestExpiresAt).toBe(snapshot.earliestExpiresAt);
+    expect(after.control.lastClockSeenAt).toBe(now);
+    now = NOW;
+    await expect(repository.readSnapshot(() => now)).rejects.toMatchObject({ code: 'clock-unverified' });
+  });
+  it('samples a queued read and write after state acquisition and still enforces expiry', async () => {
+    await seed();
+    let now = NOW;
+    const original = db.videos.toArray.bind(db.videos);
+    vi.spyOn(db.videos, 'toArray').mockImplementationOnce(() => original().then((records) => {
+      now = '2026-10-04T12:00:00.002Z'; return records;
+    }));
+    expect((await repository.readSnapshot(() => now)).control.lastClockSeenAt).toBe(now);
+    const updated = await repository.saveOwner(owner(), snapshot.fence, () => now);
+    expect(updated.control.lastClockSeenAt).toBe(now);
+    now = '2026-10-15T00:00:00.000Z';
+    await expect(repository.saveOwner(owner(), updated.fence, () => now)).rejects.toMatchObject({ code: 'expired' });
+    expect(await repository.enforceRetention(() => now)).toBe('deleted');
+  });
   it('opens the canonical database with one schema and genuinely empty data', async () => {
     expect(db.name).toBe('likedex');
     expect(db.verno).toBe(1);

@@ -269,3 +269,128 @@ test('3547-record library stays page bounded and local while selection and filte
   expect(await page.evaluate(() => [...(window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls])).toEqual(calls);
   await page.close();
 });
+
+test('consecutive page revision bursts keep identity, progress and local browsing usable in flight', async () => {
+  const page = await open('active');
+  await expect(page.locator('.video-row')).toHaveCount(50);
+  await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sync in progress', exact: true })).toBeDisabled();
+  await page.evaluate(() => {
+    const violations: string[] = [];
+    (window as unknown as { syncViolations: string[] }).syncViolations = violations;
+    new MutationObserver(() => {
+      if (!document.querySelector('.video-row')) violations.push('rows disappeared');
+      if (document.querySelector<HTMLInputElement>('[aria-label="Search library"]')?.disabled) violations.push('search disabled');
+      if (!document.querySelector('.connection h2')) violations.push('identity disappeared');
+      if (!document.querySelector('.header-actions button')?.textContent?.includes('Sync in progress')) violations.push('sync became idle');
+      if (document.querySelector('.loading-state, .empty.error')) violations.push('library loading/error');
+    }).observe(document.querySelector('main')!, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
+  await page.getByLabel('Search library').fill('video');
+  await page.getByText('Filter library', { exact: true }).click();
+  await page.getByLabel('Channels', { exact: true }).selectOption(['channel-a']);
+  await page.getByLabel('Duration', { exact: true }).selectOption('medium');
+  await page.getByLabel('Sort', { exact: true }).selectOption('title');
+  await expect(page.locator('.video-row')).toHaveCount(10);
+  for (let number = 3; number <= 6; number++) {
+    await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.holdReads());
+    for (const [count, phase] of [[number - 1, 'applying'], [number, 'applying'], [number, 'scanning']] as const) {
+      await page.evaluate(({ count, phase }) => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.progress(count, phase), { count, phase });
+      await expect.poll(() => page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.pendingReads())).toBeGreaterThanOrEqual(2);
+      await expect(page.locator('.video-row')).toHaveCount(10);
+      await expect(page.getByLabel('Search library')).toBeEnabled();
+      await expect(page.getByLabel('Channels', { exact: true })).toBeEnabled();
+      await expect(page.getByLabel('Date basis', { exact: true })).toBeEnabled();
+      await expect(page.getByLabel('Duration', { exact: true })).toBeEnabled();
+      await expect(page.getByLabel('Sort', { exact: true })).toBeEnabled();
+      await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Sync in progress', exact: true })).toBeDisabled();
+      // Search is actually used while both authoritative reads are held.
+      await page.getByLabel('Search library').fill('video 004'); await expect(page.locator('.video-row')).toHaveCount(1);
+      await page.getByLabel('Search library').fill('video'); await expect(page.locator('.video-row')).toHaveCount(10);
+    }
+    await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
+    await expect(page.getByText(`${number} pages accepted · ${number * 50} unique memberships observed`)).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Scanning liked videos' })).toBeVisible();
+    await expect(page.getByText('Loading local snapshot…')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Library unavailable' })).toHaveCount(0);
+    await expect(page.getByText('Local storage could not be read or saved.', { exact: false })).toHaveCount(0);
+  }
+  expect(await page.evaluate(() => (window as unknown as { syncViolations: string[] }).syncViolations)).toEqual([]);
+  await page.close();
+});
+
+for (const boundary of ['generation', 'epoch'] as const) {
+  test(`${boundary} revision immediately clears library and auth identity while refresh is held`, async () => {
+    const page = await open('active');
+    await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+    await page.evaluate((boundary) => {
+      const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
+      h.holdReads(); h.invalidate(boundary);
+    }, boundary);
+    await expect(page.locator('.video-row')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'My channel' })).toHaveCount(0);
+    await expect(page.getByLabel('Search library')).toBeDisabled();
+    await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
+    await expect(page.getByText('Connected, never synced.', { exact: false })).toBeVisible();
+    await expect(page.locator('.video-row')).toHaveCount(0);
+    await page.close();
+  });
+}
+
+test('hidden surface drops cached data and ignores held replies until a fresh visible observation', async () => {
+  const page = await open('active');
+  await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  await page.evaluate(() => {
+    const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
+    h.holdReads(); h.progress(3, 'applying');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    h.releaseReads();
+  });
+  await expect(page.locator('.video-row')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'My channel' })).toHaveCount(0);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.locator('.video-row')).toHaveCount(50);
+  await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  await page.close();
+});
+
+test('auth alone fences a cached library on a dropped context broadcast and late library response', async () => {
+  const page = await open('active');
+  await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  await page.evaluate(() => {
+    const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
+    h.holdReads(['LIBRARY_SNAPSHOT_GET']); h.invalidate('generation', false);
+    window.dispatchEvent(new Event('focus'));
+  });
+  await expect(page.locator('.video-row')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'My channel' })).toHaveCount(0);
+  await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
+  await expect(page.getByText('Connected, never synced.', { exact: false })).toBeVisible();
+  await expect(page.locator('.video-row')).toHaveCount(0);
+  await page.close();
+});
+
+test('same-context passive auth pending retains eligible identity, but an actual auth failure fences a delayed library reply', async () => {
+  const page = await open('active');
+  await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  await page.evaluate(() => {
+    const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
+    h.holdReads(['LIBRARY_SNAPSHOT_GET']); h.change('auth-pending');
+  });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.pendingReads())).toBe(1);
+  await expect(page.locator('.video-row')).toHaveCount(50);
+  await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sync in progress', exact: true })).toBeDisabled();
+  await change(page, 'auth-error');
+  await expect(page.getByRole('heading', { name: 'Connection status unavailable' })).toBeVisible();
+  await expect(page.locator('.video-row')).toHaveCount(0);
+  await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
+  await expect(page.getByRole('heading', { name: 'Library unavailable' })).toBeVisible();
+  await expect(page.locator('.video-row')).toHaveCount(0);
+  await page.close();
+});

@@ -55,7 +55,7 @@ export class AuthenticationService {
     return this.safe(async () => {
       if (this.disconnecting || this.activeCheck !== null) throw new AuthenticationError('busy');
       let retentionFailure: unknown;
-      try { await this.repository.enforceRetention(this.now()); }
+      try { await this.repository.enforceRetention(() => this.now()); }
       catch (error) { retentionFailure = error; }
       if (this.disconnecting) throw new AuthenticationError('busy');
       let control = await this.repository.readControl();
@@ -121,7 +121,7 @@ export class AuthenticationService {
       this.activeCheck = controller;
       this.validated = null;
       try {
-        const before = await this.repository.readSnapshot(this.now());
+        const before = await this.repository.readSnapshot(() => this.now());
         assertNotAborted(controller.signal);
         if (!interactive && before.control.connectionGate !== 'connected') throw new AuthenticationError('auth-required');
         let bootstrap: AuthenticatedYouTubeBootstrap;
@@ -140,7 +140,7 @@ export class AuthenticationService {
           throw failure;
         }
         assertNotAborted(controller.signal);
-        const after = await this.repository.readSnapshot(this.now());
+        const after = await this.repository.readSnapshot(() => this.now());
         if (!this.sameContext(before.control, after.control)) throw new AuthenticationError('cancelled');
         const comparison = compareOwner(after.owner, bootstrap);
         if (comparison === 'DIFFERENT_REMOTE_OWNER') {
@@ -152,8 +152,8 @@ export class AuthenticationService {
         const now = this.now();
         const control = interactive
           ? (await this.repository.saveConnectionState({ connectionGate: 'connected', authorizationCheckDueAt: this.dueAt(now) },
-            after.fence, now)).control
-          : await this.repository.recordAuthorizationCheck(this.dueAt(now), after.control, now);
+            after.fence, this.now)).control
+          : await this.repository.recordAuthorizationCheck(this.dueAt(now), after.control, this.now);
         assertNotAborted(controller.signal);
         // Candidate only. Sync's authoritative owner-binding transaction is later.
         const result: BootstrapResult = { status: 'authorized', bootstrap, ownerComparison: comparison };

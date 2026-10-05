@@ -21,6 +21,13 @@ export class StorageError extends Error {
   }
 }
 
+// A live supplier is sampled inside the transaction, after queued work and
+// state reads. Explicit instants remain useful for deterministic callers.
+export type RepositoryTime = string | (() => string);
+function transactionTime(time: RepositoryTime): string {
+  return parse(instantSchema, typeof time === 'function' ? time() : time, 'invalid-input');
+}
+
 export type ControlFence = Pick<WriteFence, 'dataGeneration' | 'authEpoch' | 'revision'>;
 const controlFenceSchema = fenceSchema.pick({ dataGeneration: true, authEpoch: true, revision: true });
 const emptyControl = (): ControlState => ({
@@ -155,9 +162,10 @@ export class LibraryRepository {
 
   // Local freshness/cleanup validation only. The future coordinator MUST also
   // validate authorization before exposing this snapshot to UI or Export.
-  async readSnapshot(now: string): Promise<LibrarySnapshot> {
+  async readSnapshot(time: RepositoryTime): Promise<LibrarySnapshot> {
     return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
       const snapshot = await this.state();
+      const now = transactionTime(time);
       this.assertEligible(snapshot, now);
       snapshot.control.lastClockSeenAt = now;
       await this.db.control.put(snapshot.control, SINGLETON_KEY);
@@ -165,14 +173,15 @@ export class LibraryRepository {
     }));
   }
 
-  private async mutate(expected: WriteFence, now: string,
-    write: (snapshot: LibrarySnapshot, nextRevision: number) => Promise<void>): Promise<LibrarySnapshot> {
+  private async mutate(expected: WriteFence, time: RepositoryTime,
+    write: (snapshot: LibrarySnapshot, nextRevision: number, now: string) => Promise<void>): Promise<LibrarySnapshot> {
     return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
       const before = await this.state();
+      const now = transactionTime(time);
       this.assertEligible(before, now);
       this.assertFence(before, expected);
       const revision = increment(before.control.revision);
-      await write(before, revision);
+      await write(before, revision, now);
       await this.db.control.put({ ...before.control, revision, lastClockSeenAt: now }, SINGLETON_KEY);
       const after = await this.state();
       this.assertEligible(after, now);
@@ -180,9 +189,9 @@ export class LibraryRepository {
     }));
   }
 
-  async saveOwner(value: RemoteOwner, expected: WriteFence, now: string): Promise<LibrarySnapshot> {
+  async saveOwner(value: RemoteOwner, expected: WriteFence, time: RepositoryTime): Promise<LibrarySnapshot> {
     const owner = parse(ownerSchema, value, 'invalid-input');
-    return this.mutate(expected, now, async (snapshot) => {
+    return this.mutate(expected, time, async (snapshot) => {
       if (snapshot.owner !== null && snapshot.owner.channelId !== owner.channelId) {
         throw new StorageError('owner-mismatch');
       }
@@ -192,10 +201,10 @@ export class LibraryRepository {
 
   // Pure persistence of a future auth adapter's result; no token/API behavior.
   async saveConnectionState(value: Pick<ControlState, 'connectionGate' | 'authorizationCheckDueAt'>,
-    expected: WriteFence, now: string): Promise<LibrarySnapshot> {
+    expected: WriteFence, time: RepositoryTime): Promise<LibrarySnapshot> {
     const connection = parse(z.strictObject({ connectionGate: controlSchema.shape.connectionGate,
       authorizationCheckDueAt: controlSchema.shape.authorizationCheckDueAt }), value, 'invalid-input');
-    return this.mutate(expected, now, async (snapshot) => {
+    return this.mutate(expected, time, async (snapshot) => {
       snapshot.control.connectionGate = connection.connectionGate;
       snapshot.control.authorizationCheckDueAt = connection.authorizationCheckDueAt;
       snapshot.control.authEpoch = increment(snapshot.control.authEpoch);
@@ -203,13 +212,13 @@ export class LibraryRepository {
   }
 
   // Successful periodic checks do not change auth epoch or refresh API facts.
-  async recordAuthorizationCheck(dueAt: string, expected: ControlFence, now: string): Promise<ControlState> {
+  async recordAuthorizationCheck(dueAt: string, expected: ControlFence, time: RepositoryTime): Promise<ControlState> {
     parse(instantSchema, dueAt, 'invalid-input');
-    parse(instantSchema, now, 'invalid-input');
-    if (dueAt <= now || Date.parse(dueAt) - Date.parse(now) > 24 * 60 * 60 * 1000) throw new StorageError('invalid-input');
     return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
       const snapshot = await this.state();
+      const now = transactionTime(time);
       this.assertEligible(snapshot, now);
+      if (dueAt <= now || Date.parse(dueAt) - Date.parse(now) > 24 * 60 * 60 * 1000) throw new StorageError('invalid-input');
       assertControlFence(snapshot.control, expected);
       if (snapshot.control.connectionGate !== 'connected') throw new StorageError('stale-write');
       const next: ControlState = { ...snapshot.control, authorizationCheckDueAt: dueAt,
@@ -240,9 +249,9 @@ export class LibraryRepository {
     if (attempt.ownerChannelId !== (snapshot.owner?.channelId ?? null)) throw new StorageError('owner-mismatch');
   }
 
-  async saveCurrentAttempt(value: SyncAttempt, expected: WriteFence, now: string): Promise<LibrarySnapshot> {
+  async saveCurrentAttempt(value: SyncAttempt, expected: WriteFence, time: RepositoryTime): Promise<LibrarySnapshot> {
     const attempt = parse(attemptSchema, value, 'invalid-input');
-    return this.mutate(expected, now, async (snapshot) => {
+    return this.mutate(expected, time, async (snapshot) => {
       this.assertAttempt(attempt, snapshot);
       const sync = snapshot.sync ?? emptySync();
       if (sync.currentAttempt !== null && sync.currentAttempt.attemptId !== attempt.attemptId) {
@@ -256,9 +265,9 @@ export class LibraryRepository {
 
   // Metadata persistence, not finalization. Phase 5 must add an atomic trusted
   // finalizer before any real sync may publish success or remove membership.
-  async saveLatestSuccessfulSync(value: LatestSuccessfulSync, expected: WriteFence, now: string): Promise<LibrarySnapshot> {
+  async saveLatestSuccessfulSync(value: LatestSuccessfulSync, expected: WriteFence, time: RepositoryTime): Promise<LibrarySnapshot> {
     const success = parse(latestSuccessSchema, value, 'invalid-input');
-    return this.mutate(expected, now, async (snapshot) => {
+    return this.mutate(expected, time, async (snapshot) => {
       if (success.ownerChannelId !== snapshot.owner?.channelId) throw new StorageError('owner-mismatch');
       if (success.dataGeneration !== snapshot.control.dataGeneration) throw new StorageError('stale-write');
       const sync = snapshot.sync ?? emptySync();
@@ -270,12 +279,12 @@ export class LibraryRepository {
   // Complete record upserts only, never "replace membership" or implicit pruning.
   // Optional checkpoint commits in the same transaction. Expected revision makes
   // replay of the same local write fail; remote page deduplication is Phase 5.
-  async upsertVideos(values: MirroredVideo[], expected: WriteFence, now: string,
+  async upsertVideos(values: MirroredVideo[], expected: WriteFence, time: RepositoryTime,
     checkpoint?: SyncAttempt): Promise<LibrarySnapshot> {
     const videos = parse(z.array(videoSchema), values, 'invalid-input');
     const attempt = checkpoint === undefined ? undefined : parse(attemptSchema, checkpoint, 'invalid-input');
     if (new Set(videos.map((video) => video.videoId)).size !== videos.length) throw new StorageError('invalid-input');
-    return this.mutate(expected, now, async (snapshot, revision) => {
+    return this.mutate(expected, time, async (snapshot, revision) => {
       if (snapshot.owner === null || videos.some((video) => video.ownerChannelId !== snapshot.owner?.channelId)) {
         throw new StorageError('owner-mismatch');
       }
@@ -302,11 +311,12 @@ export class LibraryRepository {
   // Claim within one transaction. A simultaneous loser observes the durable
   // winner, including when another service instance owns the running task.
   async claimSyncAttempt(value: Pick<SyncAttempt, 'attemptId' | 'requestId' | 'workerInstanceId'>,
-    now: string): Promise<{ status: 'started' | 'already-active'; snapshot: LibrarySnapshot }> {
+    time: RepositoryTime): Promise<{ status: 'started' | 'already-active'; snapshot: LibrarySnapshot }> {
     parse(z.strictObject({ attemptId: attemptSchema.shape.attemptId, requestId: attemptSchema.shape.requestId,
       workerInstanceId: attemptSchema.shape.workerInstanceId }), value, 'invalid-input');
     return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
       const snapshot = await this.state();
+      const now = transactionTime(time);
       this.assertEligible(snapshot, now);
       if (snapshot.control.connectionGate !== 'connected') throw new StorageError('invalid-input');
       if (snapshot.sync?.currentAttempt && isActiveAttempt(snapshot.sync.currentAttempt.state)) {
@@ -346,8 +356,8 @@ export class LibraryRepository {
       || verification.owner.likesPlaylistId !== snapshot.owner.likesPlaylistId)) throw new StorageError('owner-mismatch');
   }
 
-  async bindSyncOwner(verification: VerifiedSyncOwner, expected: WriteFence, now: string): Promise<LibrarySnapshot> {
-    return this.mutate(expected, now, async (snapshot) => {
+  async bindSyncOwner(verification: VerifiedSyncOwner, expected: WriteFence, time: RepositoryTime): Promise<LibrarySnapshot> {
+    return this.mutate(expected, time, async (snapshot, _revision, now) => {
       this.assertVerifiedOwner(verification, snapshot);
       const attempt = this.activeAttempt(snapshot);
       if (attempt.state !== 'preparing' || verification.checkNumber !== 1 || verification.observedAt > now) throw new StorageError('invalid-input');
@@ -361,8 +371,8 @@ export class LibraryRepository {
   }
 
   async transitionSyncAttempt(state: 'scanning' | 'applying' | 'finalizing', expected: WriteFence,
-    now: string): Promise<LibrarySnapshot> {
-    return this.mutate(expected, now, async (snapshot) => {
+    time: RepositoryTime): Promise<LibrarySnapshot> {
+    return this.mutate(expected, time, async (snapshot, _revision, now) => {
       const attempt = this.activeAttempt(snapshot);
       if (!canTransition(attempt.state, state)) throw new StorageError('invalid-input');
       snapshot.sync!.currentAttempt = parse(attemptSchema, { ...attempt, state, updatedAt: now }, 'invalid-input');
@@ -370,12 +380,12 @@ export class LibraryRepository {
     });
   }
 
-  async applyProviderPage(value: ProviderPage, expected: WriteFence, now: string): Promise<LibrarySnapshot> {
+  async applyProviderPage(value: ProviderPage, expected: WriteFence, time: RepositoryTime): Promise<LibrarySnapshot> {
     const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
     const page = parse(z.strictObject({ kind: z.literal('page'), pageNumber: count, terminal: z.boolean(),
       records: z.array(videoSchema), progress: z.strictObject({ pagesAccepted: count, rawItems: count,
         uniqueMembership: count, duplicateVideoItems: count, estimatedTotal: count.nullable() }) }), value, 'invalid-input');
-    return this.mutate(expected, now, async (snapshot, revision) => {
+    return this.mutate(expected, time, async (snapshot, revision, now) => {
       const attempt = this.activeAttempt(snapshot);
       if (attempt.state !== 'applying' || page.pageNumber !== attempt.pagesAccepted + 1
         || page.progress.pagesAccepted !== page.pageNumber || page.progress.rawItems < attempt.rawItems
@@ -409,8 +419,8 @@ export class LibraryRepository {
     });
   }
 
-  async finishSyncAttempt(error: DomainError, expected: WriteFence, now: string): Promise<LibrarySnapshot> {
-    return this.mutate(expected, now, async (snapshot) => {
+  async finishSyncAttempt(error: DomainError, expected: WriteFence, time: RepositoryTime): Promise<LibrarySnapshot> {
+    return this.mutate(expected, time, async (snapshot, _revision, now) => {
       const attempt = this.activeAttempt(snapshot);
       const state = attemptOutcome(attempt, error);
       if (!canTransition(attempt.state, state)) throw new StorageError('invalid-input');
@@ -422,10 +432,10 @@ export class LibraryRepository {
 
   // The sole membership-pruning transaction. Reject provenance before reading
   // the database; summaries, booleans and JSON can never enter this boundary.
-  async finalizeTrustedEnumeration(proof: unknown, expected: WriteFence, now: string,
+  async finalizeTrustedEnumeration(proof: unknown, expected: WriteFence, time: RepositoryTime,
     finalOwner?: VerifiedSyncOwner): Promise<LibrarySnapshot> {
     if (!isTrustedProviderCompletion(proof)) throw new StorageError('invalid-input');
-    return this.mutate(expected, now, async (snapshot, revision) => {
+    return this.mutate(expected, time, async (snapshot, revision, now) => {
       this.assertVerifiedOwner(finalOwner, snapshot);
       const attempt = this.activeAttempt(snapshot);
       if (attempt.state !== 'finalizing') throw new StorageError('attempt-mismatch');
@@ -473,11 +483,12 @@ export class LibraryRepository {
     });
   }
 
-  async recoverSyncInterruption(workerInstanceId: string, now: string): Promise<LibrarySnapshot> {
+  async recoverSyncInterruption(workerInstanceId: string, time: RepositoryTime): Promise<LibrarySnapshot> {
     parse(z.uuid(), workerInstanceId, 'invalid-input');
-    await this.enforceRetention(now);
+    await this.enforceRetention(time);
     return this.operation(() => this.db.transaction('rw', this.db.tables, async () => {
       const snapshot = await this.state();
+      const now = transactionTime(time);
       this.assertEligible(snapshot, now);
       const attempt = snapshot.sync?.currentAttempt;
       if (!attempt || !isActiveAttempt(attempt.state) || attempt.workerInstanceId === workerInstanceId) return snapshot;
@@ -560,15 +571,15 @@ export class LibraryRepository {
   }
 
   // Explicit pure-local expiry/recovery primitive. No scheduler or network refresh.
-  async enforceRetention(now: string): Promise<'unchanged' | 'deleted'> {
-    parse(instantSchema, now, 'invalid-input');
+  async enforceRetention(time: RepositoryTime): Promise<'unchanged' | 'deleted'> {
+    transactionTime(time);
     const control = await this.readControl();
     if (control.pendingCleanupReason !== null) {
       await this.finishCleanup(control);
       return 'deleted';
     }
     try {
-      await this.readSnapshot(now);
+      await this.readSnapshot(time);
       return 'unchanged';
     } catch (error) {
       if (!(error instanceof StorageError) || !['expired', 'invalid-data'].includes(error.code)) throw error;

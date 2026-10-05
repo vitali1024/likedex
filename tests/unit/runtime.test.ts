@@ -13,7 +13,7 @@ import { PRODUCTION_PROVIDER_VALIDATION_APPROVED } from '@/src/runtime/productio
 import { type RuntimeOperation, type RuntimeRequest, type RevisionEvent, resultSchemas } from '@/src/runtime/contracts';
 import { attempt, NOW, OBSERVED, owner, success, video } from '../fixtures/storage';
 import { channelResponse, chromeIdentity, held, json, timing } from '../fixtures/authentication';
-import { membershipPage, videosPage } from '../fixtures/provider';
+import { member, membershipPage, metadata, videosPage } from '../fixtures/provider';
 
 const EXTENSION = 'mmefiakgfhddiojfdnkfpfpbkgbfgkgj';
 const SENDER = { id: EXTENSION, url: `chrome-extension://${EXTENSION}/options.html` };
@@ -37,8 +37,12 @@ function manualScheduler() {
     expect(job).toBeDefined(); job!.cancelled = true; job!.callback(); } };
 }
 function request(operation: RuntimeOperation): RuntimeRequest { return { protocolVersion: 1, requestId: REQUEST, operation, payload: {} }; }
-async function setup(options: { seed?: boolean; connected?: boolean; gate?: unknown; worker?: string; diagnostics?: boolean } = {}) {
+async function setup(options: { seed?: boolean; connected?: boolean; gate?: unknown; worker?: string; diagnostics?: boolean; advancingClock?: boolean } = {}) {
   let now = NOW;
+  const clock = () => {
+    if (options.advancingClock) now = new Date(Date.parse(now) + 1).toISOString();
+    return now;
+  };
   const listeners = new Set<(event: RevisionEvent) => void>();
   const events: RevisionEvent[] = [];
   const db = new LikedexDatabase('likedex', { indexedDB: new IDBFactory(), IDBKeyRange }); databases.push(db);
@@ -61,21 +65,22 @@ async function setup(options: { seed?: boolean; connected?: boolean; gate?: unkn
   }
   const chrome = chromeIdentity();
   const fetcher = vi.fn<FetchBoundary>().mockImplementation(async () => json());
-  const requests = new GoogleAuthorizationRequests(new ChromeIdentityAdapter(chrome), fetcher, timing());
-  const auth = new AuthenticationService(repository, requests, () => now);
+  const requests = new GoogleAuthorizationRequests(new ChromeIdentityAdapter(chrome), fetcher,
+    { ...timing(), now: () => Date.parse(clock()) });
+  const auth = new AuthenticationService(repository, requests, clock);
   const timers = manualScheduler();
   let sequence = 100;
-  const sync = new SynchronizationService(repository, requests, options.worker ?? WORKER, () => now,
+  const sync = new SynchronizationService(repository, requests, options.worker ?? WORKER, clock,
     () => `00000000-0000-4000-8000-${String(sequence++).padStart(12, '0')}`, (receipt) => {
       auth.acceptSyncAuthorization(receipt); coordinator.authorizationValidated(receipt.scope);
     });
   const coordinator = new RuntimeCoordinator(repository, auth, sync, EXTENSION,
-    { providerValidationApproved: options.gate, now: () => now, scheduler: timers.scheduler, diagnosticsEnabled: options.diagnostics ?? false });
+    { providerValidationApproved: options.gate, now: clock, scheduler: timers.scheduler, diagnosticsEnabled: options.diagnostics ?? false });
   coordinators.push(coordinator);
   const client = () => new RuntimeClient({ send: (message) => coordinator.handle(message, SENDER),
     subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; } });
   return { db, repository, snapshot, chrome, fetcher, requests, auth, sync, coordinator, client, timers, events,
-    setNow: (value: string) => { now = value; } };
+    clock, setNow: (value: string) => { now = value; } };
 }
 async function records(db: LikedexDatabase) { return Promise.all(db.tables.map((table) => table.toArray())); }
 
@@ -282,6 +287,41 @@ describe('Runtime local data/auth and failure truth (AC-AUTH-001/002/003/007/009
 });
 
 describe('Runtime active sync/recovery (AC-SYNC-003/004/007/008/012)', () => {
+  it('overlaps snapshot/auth requests with six real page commits under an advancing clock', async () => {
+    const h = await setup({ seed: true, gate: true, advancingClock: true });
+    const pages = Array.from({ length: 6 }, () => held<Response>());
+    let requestedPages = 0;
+    h.fetcher.mockImplementation(async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith('/channels')) return json(channelResponse());
+      if (parsed.pathname.endsWith('/playlistItems')) return pages[requestedPages++]!.promise;
+      const ids = parsed.searchParams.get('id')!.split(',');
+      return json(videosPage(ids.map((id) => metadata(Number(id.slice(1))))));
+    });
+    const codes: string[] = [];
+    const read = h.repository.readSnapshot.bind(h.repository);
+    vi.spyOn(h.repository, 'readSnapshot').mockImplementation(async (...args) => {
+      try { return await read(...args); }
+      catch (error) { if (error instanceof StorageError) codes.push(error.code); throw error; }
+    });
+    const start = vi.spyOn(h.sync, 'start');
+    expect(await h.client().request('SYNC_START')).toMatchObject({ ok: true });
+    const launch = await start.mock.results[0]!.value;
+    for (let index = 0; index < pages.length; index++) {
+      await vi.waitFor(() => expect(requestedPages).toBe(index + 1));
+      const reads = Array.from({ length: 12 }, (_, i) => h.client().request(i % 2 ? 'AUTH_STATUS_GET' : 'LIBRARY_SNAPSHOT_GET'));
+      pages[index]!.resolve(json(membershipPage([member(index + 1)], index < 5 ? `next-${index + 1}` : undefined, 6)));
+      const results = await Promise.all(reads);
+      expect(codes).toEqual([]);
+      expect(results.every((result) => result.ok)).toBe(true);
+      await vi.waitFor(async () => expect((await h.repository.readSnapshot(h.clock)).sync?.currentAttempt?.pagesAccepted).toBe(index + 1));
+    }
+    expect(await launch.completion).toMatchObject({ status: 'success' });
+    expect(codes).toEqual([]);
+    expect((await h.repository.readSnapshot(h.clock)).sync?.latestSuccessfulSync).toMatchObject({ pageCount: 6, localMembershipCount: 6 });
+    h.setNow(NOW);
+    await expect(h.repository.readSnapshot(h.clock)).rejects.toMatchObject({ code: 'clock-unverified' });
+  });
   it('acknowledges before held bootstrap within 1 second; duplicate clients share durable truth', async () => {
     const h = await setup({ gate: PRODUCTION_PROVIDER_VALIDATION_APPROVED, seed: true });
     const bootstrap = held<Response>(); const page = held<Response>();

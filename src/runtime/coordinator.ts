@@ -66,7 +66,7 @@ export class RuntimeCoordinator {
   // Timers are opportunistic; every data request repeats the barriers on wake.
   async enforceLifecycle(): Promise<void> {
     await this.initialize();
-    await this.repository.enforceRetention(this.now());
+    await this.repository.enforceRetention(() => this.now());
     const control = await this.repository.readControl();
     if (control.connectionGate === 'connected' && (control.authorizationCheckDueAt === null
       || this.now() >= control.authorizationCheckDueAt)) {
@@ -75,7 +75,7 @@ export class RuntimeCoordinator {
       await this.authorize();
     }
     this.lifecycleFailure = null;
-    this.arm(await this.repository.readSnapshot(this.now()));
+    this.arm(await this.repository.readSnapshot(() => this.now()));
   }
   dispose(): void { this.stopped = true; this.cancelTimer?.(); }
 
@@ -114,7 +114,7 @@ export class RuntimeCoordinator {
     if (this.syncAuthorizationPending) throw new RuntimeBoundaryError(failure('authorization-pending'));
     const auth = await this.authorize();
     if (auth.status === 'owner-mismatch') throw new AuthenticationError('owner-mismatch');
-    const snapshot = await this.repository.readSnapshot(this.now());
+    const snapshot = await this.repository.readSnapshot(() => this.now());
     if (auth.status === 'auth-required' && (snapshot.owner !== null || snapshot.videos.length || snapshot.sync !== null)) {
       throw new RuntimeBoundaryError(failure('data-unavailable'));
     }
@@ -149,7 +149,7 @@ export class RuntimeCoordinator {
           return { status: 'validation-pending', control: this.authControl(control) };
         }
         const result = await this.authorize();
-        const snapshot = await this.repository.readSnapshot(this.now());
+        const snapshot = await this.repository.readSnapshot(() => this.now());
         this.arm(snapshot);
         return { ...this.authDto(snapshot.control.connectionGate === 'disconnected' ? { status: 'auth-required' } : result),
           control: this.authControl(snapshot.control) };
@@ -159,7 +159,7 @@ export class RuntimeCoordinator {
         this.connecting = true;
         try {
           const result: BootstrapResult = await this.auth.connectInteractively();
-          this.arm(await this.repository.readSnapshot(this.now()));
+          this.arm(await this.repository.readSnapshot(() => this.now()));
           return this.authDto(result);
         } finally { this.connecting = false; }
       }
@@ -169,8 +169,8 @@ export class RuntimeCoordinator {
       }
       case 'SYNC_STATUS_GET': {
         if (this.syncAuthorizationPending || this.authorizationCheck !== null) {
-          await this.repository.enforceRetention(this.now());
-          const snapshot = await this.repository.readSnapshot(this.now());
+          await this.repository.enforceRetention(() => this.now());
+          const snapshot = await this.repository.readSnapshot(() => this.now());
           if (!this.authorizationKnown(snapshot)) return this.pendingStatus(snapshot);
         }
         const snapshot = await this.eligibleSnapshot();
@@ -189,7 +189,7 @@ export class RuntimeCoordinator {
               if (result.status === 'status-unsaved') {
                 this.unsavedStatus = true;
               }
-              this.arm(await this.repository.readSnapshot(this.now()));
+              this.arm(await this.repository.readSnapshot(() => this.now()));
             }).catch((error: unknown) => { this.lifecycleFailure = error; });
           }
           return { status: launch.status, attempt: { attemptId: launch.attempt.attemptId, state: launch.attempt.state } };

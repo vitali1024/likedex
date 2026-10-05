@@ -47,10 +47,10 @@ export class SynchronizationService {
 
   async start(requestId: string): Promise<SyncLaunch> {
     z.uuid().parse(requestId);
-    await this.repository.enforceRetention(this.now());
+    await this.repository.enforceRetention(() => this.now());
     if ((await this.repository.readControl()).connectionGate !== 'connected') throw new AuthenticationError('auth-required');
     const claim = await this.repository.claimSyncAttempt({ requestId, workerInstanceId: this.workerInstanceId,
-      attemptId: this.nextId() }, this.now());
+      attemptId: this.nextId() }, this.now);
     const attempt = claim.snapshot.sync!.currentAttempt!;
     if (claim.status === 'already-active') {
       return { status: 'already-active', attempt, completion: this.tasks.get(attempt.attemptId)?.completion ?? null };
@@ -66,12 +66,12 @@ export class SynchronizationService {
   // persisted state separately. Clear/Disconnect additionally fence storage.
   cancel(attemptId: string): void { this.tasks.get(attemptId)?.abort.abort(); }
   recoverInterruption(): Promise<LibrarySnapshot> {
-    return this.repository.recoverSyncInterruption(this.workerInstanceId, this.now());
+    return this.repository.recoverSyncInterruption(this.workerInstanceId, () => this.now());
   }
-  observe(): Promise<LibrarySnapshot> { return this.repository.readSnapshot(this.now()); }
+  observe(): Promise<LibrarySnapshot> { return this.repository.readSnapshot(() => this.now()); }
 
   private async current(initial: SyncAttempt): Promise<LibrarySnapshot> {
-    const snapshot = await this.repository.readSnapshot(this.now());
+    const snapshot = await this.repository.readSnapshot(() => this.now());
     if (snapshot.control.dataGeneration !== initial.dataGeneration || snapshot.control.authEpoch !== initial.authEpoch
       || snapshot.sync?.currentAttempt?.attemptId !== initial.attemptId
       || !isActiveAttempt(snapshot.sync.currentAttempt.state)) throw new StorageError('stale-write');
@@ -94,12 +94,12 @@ export class SynchronizationService {
       };
       const firstOwner = await verify();
       snapshot = await this.current(initial);
-      snapshot = await this.repository.bindSyncOwner(firstOwner, snapshot.fence, this.now());
+      snapshot = await this.repository.bindSyncOwner(firstOwner, snapshot.fence, this.now);
       await this.repository.recordAuthorizationCheck(new Date(Date.parse(this.now()) + 86_400_000).toISOString(),
-        snapshot.control, this.now());
+        snapshot.control, this.now);
       this.authorizationValidated(firstOwner);
       snapshot = await this.current(initial);
-      snapshot = await this.repository.transitionSyncAttempt('scanning', snapshot.fence, this.now());
+      snapshot = await this.repository.transitionSyncAttempt('scanning', snapshot.fence, this.now);
       phase = 'scanning';
       let proof: TrustedProviderCompletion | null = null;
       for await (const event of this.provider.enumerateLikedVideos({ attemptId: initial.attemptId,
@@ -107,20 +107,20 @@ export class SynchronizationService {
         snapshot = await this.current(initial);
         session.assertActive();
         if (event.kind === 'page') {
-          snapshot = await this.repository.transitionSyncAttempt('applying', snapshot.fence, this.now());
+          snapshot = await this.repository.transitionSyncAttempt('applying', snapshot.fence, this.now);
           phase = 'applying';
-          snapshot = await this.repository.applyProviderPage(event, snapshot.fence, this.now());
+          snapshot = await this.repository.applyProviderPage(event, snapshot.fence, this.now);
           // Terminal evidence arrives only after the last page has committed.
           // Stay applying until the stream tells us whether another page exists.
         } else {
           proof = event;
-          snapshot = await this.repository.transitionSyncAttempt('finalizing', snapshot.fence, this.now());
+          snapshot = await this.repository.transitionSyncAttempt('finalizing', snapshot.fence, this.now);
           phase = 'finalizing';
         }
         if (event.kind === 'page' && !event.terminal) {
           // A continuation returns to scanning. A terminal page stays applying
           // until the provider issues its separate provenance-backed proof.
-          snapshot = await this.repository.transitionSyncAttempt('scanning', snapshot.fence, this.now());
+          snapshot = await this.repository.transitionSyncAttempt('scanning', snapshot.fence, this.now);
           phase = 'scanning';
         }
       }
@@ -128,7 +128,7 @@ export class SynchronizationService {
       const finalOwner = await verify();
       snapshot = await this.current(initial);
       session.assertActive();
-      await this.repository.finalizeTrustedEnumeration(proof, snapshot.fence, this.now(), finalOwner);
+      await this.repository.finalizeTrustedEnumeration(proof, snapshot.fence, this.now, finalOwner);
       return { status: 'success', attemptId: initial.attemptId, error: null };
     } catch (error) {
       const detail = syncError(error, phase);
@@ -147,14 +147,14 @@ export class SynchronizationService {
       }
       if (error instanceof StorageError && ['stale-write', 'attempt-mismatch', 'cleanup-pending', 'expired'].includes(error.code)) {
         if (error.code === 'expired') {
-          try { await this.repository.enforceRetention(this.now()); }
+          try { await this.repository.enforceRetention(() => this.now()); }
           catch { return { status: 'status-unsaved', attemptId: initial.attemptId, error: syncError(new StorageError('persistence'), phase) }; }
         }
         return { status: 'superseded', attemptId: initial.attemptId, error: detail };
       }
       try {
         snapshot = await this.current(initial);
-        const terminal = await this.repository.finishSyncAttempt(detail, snapshot.fence, this.now());
+        const terminal = await this.repository.finishSyncAttempt(detail, snapshot.fence, this.now);
         return { status: terminal.sync!.currentAttempt!.state as 'failure' | 'partial' | 'interrupted',
           attemptId: initial.attemptId, error: detail };
       } catch (saveError) {
