@@ -38,7 +38,13 @@ Safe additions and metadata updates may appear before an attempt completes. Labe
 
 Failures identify the category and useful next action: reconnect, select the correct channel, wait for quota, retry a temporary problem, or address local storage/runtime trouble. Worker interruption is shown as interrupted after recovery, with a full-retry action. No hidden infinite retry or auto-consent. Local browsing remains usable only while authorization and freshness gates permit it. A storage read failure displays an error, not an empty state.
 
-## Options experience
+## Toolbar launcher and Full Library
+
+The pinned toolbar icon opens a compact launcher with canonical Likedex branding and the tagline **Your likes, within reach.** It has exactly two primary rows: **Open Side Panel** (or **Close Side Panel** when this window's Likedex panel is open) and **Open Full Library**. Full Library is the existing full-size Options application, opened in a tab through Chrome's Options API. The popup is a launcher only, with no library rows, search/filter/sort, sync, settings, detail or data observation.
+
+The Side Panel label comes from Chrome's Side Panel contexts plus its current-window live extension views and their visibility, never a stored toggle flag. Ordinary tabs at the panel URL are excluded. This human-approved refinement handles Chrome contexts reporting window ID −1. Open and Close use real window-scoped Side Panel APIs; failed checks show an unavailable action, while failed operations show a sanitized retryable error. Successful panel actions dismiss the launcher; the next opening queries again. Full Library remains independent. Chrome **141 or newer** is required for the real Close API. [Canonical asset policy](branding-assets.md) distinguishes the global brand/toolbar assets from the dedicated border-matched popup-row icons.
+
+## Full Library (Options) experience
 
 Options is the primary full-size interface: identity/header, connection status, current attempt and last success, Sync, search, focused filters, sort, result count, bounded list, persistent selected-video detail, and settings/data controls. Wide viewports use a library/detail split; narrow widths switch to list and focused detail with Back, preserving list context. No fixed breakpoint is prescribed, but supported widths must not clip controls.
 
@@ -46,7 +52,7 @@ Details contain full title, larger thumbnail, channel, known liked/publication d
 
 ## Side Panel experience
 
-The toolbar action explicitly opens the Side Panel. There is no separate popup product surface. The panel uses **compact list → expandable row → detail route**. Rows emphasize thumbnail, title, channel, essential date/duration, and expansion state. Search/filter controls adapt to panel width and short-height scrolling.
+The launcher explicitly opens or closes the global Side Panel in the current Chrome window. Side Panel provides quick companion browsing beside the current page; Full Library provides the complete experience. The panel uses **compact list → expandable row → detail route**. Rows emphasize thumbnail, title, channel, essential date/duration, and expansion state. Search/filter controls adapt to panel width and short-height scrolling.
 
 At most one row is expanded. Expansion contains a small amount of secondary metadata and Copy link, Open on YouTube, and View details. It does not embed the full detail view. A semantic expansion button exposes expanded state; interactive actions are not nested inside another button.
 

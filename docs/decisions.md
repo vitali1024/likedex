@@ -2,6 +2,8 @@
 
 Source: the human product owner's specification and explicit B-01 resolution supplied on 2026-10-04. These are approved directions, not model recommendations. B-01 is resolved: policy compliance takes precedence and the current decisions below encode deletion on revocation and bounded freshness. Concrete enforcement mechanisms in engineering operationalize those decisions.
 
+Shell amendment, 2026-10-06: human Handoff A authorizes a launcher with exactly Side Panel and Full Library, canonical Package 1 branding and Package 2 popup-row treatment. Native Close requires Chrome 141+. A real Chromium 153 probe disproved context-only window scoping (`SIDE_PANEL.windowId === -1`); the human explicitly approved live panel window/visibility queries with no stored flag or additional permission. The implementation uses foreground `extension.getViews({windowId})`, visible exact-path views and authoritative SIDE_PANEL contexts, excluding ordinary tabs. Successful operations dismiss the launcher; every reopening re-queries. Close-animation contexts are transient and are never treated as proof of a completed close. This amendment is authorized as an unstaged patch; no commit or push is authorized. Historical evidence remains historical.
+
 | ID | Decision | Why | Trade-off | Revisit trigger |
 |---|---|---|---|---|
 | D-01 | Product/UI/Store/OAuth brand is Likedex; identifier/database `likedex`; prefix `LIKEDEX_` | One authoritative product identity | Consistent naming discipline | Technical naming restriction confirmed |

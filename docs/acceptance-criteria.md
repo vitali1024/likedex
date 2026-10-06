@@ -83,7 +83,11 @@ Release evidence status, **2026-10-04**: **live provider validation COMPLETE / A
 |---|---|---|
 | AC-OPTIONS-001 | Full-size Options shows library and persistent detail, connection/current sync/last success, controls/counts, and settings. | E, M |
 | AC-OPTIONS-002 | Narrow Options switches to reachable detail/back navigation without horizontal clipping and preserves context. | E |
-| AC-SIDEPANEL-001 | Packaged Side Panel mounts and native Chrome toolbar action opens it using explicit action/side-panel configuration. | E, M |
+| AC-SIDEPANEL-001 | Packaged Side Panel mounts; native toolbar opens the launcher and its explicit Open/Close row operates the global panel in the current window. | E, M |
+| AC-LAUNCHER-001 | Toolbar popup contains canonical Likedex branding/tagline and exactly two native primary buttons: Open/Close Side Panel and Open Full Library. No library/search/filter/sort/sync/settings/detail workflow or data observer exists. | U, E, D, M |
+| AC-LAUNCHER-002 | Chrome SIDE_PANEL contexts plus window-scoped visible extension views determine the panel label at mount/resume/after success; another-window panel or ordinary panel-URL tab cannot set Close here. Handle context window ID −1 without stored state. Real window-scoped Open/Close APIs run directly from activation; successful panel actions dismiss the launcher. | U, E, M |
+| AC-LAUNCHER-003 | Query failure leaves a mounted launcher with unknown/disabled panel action and independent Full Library; operation failures preserve label, sanitize errors and allow retry. Pending controls are disabled/busy; keyboard order and visible focus work, with no switch role. | U, E |
+| AC-LAUNCHER-004 | Full Library uses native openOptionsPage with existing options.html/open_in_tab semantics. Production popup/paths, exact permissions, Chrome 141 minimum and source-package canonical hashes pass artifact checks; diagnostic composition remains isolated with Sync blocked. | U, E, D |
 | AC-SIDEPANEL-002 | Compact rows expose essential metadata; expanding a second row collapses the first; inline content stays compact and has labeled actions. | E |
 | AC-SIDEPANEL-003 | View details opens a focused detail route with Back, full metadata, Open, and Copy; Back restores query/filter/sort/page/selection/expansion. | E |
 | AC-SIDEPANEL-004 | Back restores scroll/focus where possible; concurrent item removal yields truthful unavailable state and predictable list/focus fallback. | E |

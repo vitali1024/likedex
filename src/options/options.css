@@ -26,8 +26,7 @@ h3 { font-size: 16px; font-weight: 600; }
 .app-header { justify-content: space-between; border-bottom: 1px solid #ffffff0a; padding: 4px 4px 10px; flex: 0 0 auto; }
 .brand h1 { font-size: 23px; font-weight: 600; line-height: 1.1; letter-spacing: -.04em; }
 .brand p { font-size: 11px; color: var(--muted); margin-top: 3px; }
-.brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid #19d1ff59; border-radius: 18px; background: radial-gradient(circle at 35% 30%,#48e0ff47,#0d92c129 60%,#08142033); box-shadow: inset 0 1px 0 #ffffff17,0 0 30px #18cfff2e; color: var(--accent); }
-.brand-mark .icon { fill: currentColor; }
+.brand-mark { display: block; width: 36px; height: 36px; object-fit: contain; flex: 0 0 36px; }
 .header-actions > .icon-button { width: 40px; height: 40px; }
 .connection { flex: 0 0 auto; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(180deg,#09111cfa,#060b13fa); }
 .connection p + p { margin-top: 6px; }

@@ -55,7 +55,7 @@ Keep the suite small:
 4. Keyboard confirmation flow: Clear cancel preserves data; confirmed Clear deletes locally without revoking. Disconnect deletes authorized records and UI copies, stays locked after reload, and reconnect needs a fresh sync. A separate expiry/resume case prevents stale data flashes.
 5. Narrow dimensions/reduced motion and one dialog accessibility path work.
 
-Native toolbar opening is a separate required **real Chrome** check. Automate only if the runner can actually exercise browser chrome; navigating directly to the panel's extension URL proves route mounting, not toolbar integration. When unavailable in Playwright, retain a mandatory manual toolbar check and record the gap honestly. Unit-level provider edge cases should not all be repeated in E2E.
+Native toolbar → launcher → real current-window panel Open/Close is a separate required **real Chrome** check. Automate only if the runner can actually exercise browser chrome; navigating to popup/panel extension URLs proves mounting, not native toolbar integration. Launcher controller/component tests cover scoped Chrome context queries, open/close/Options calls, failures, pending/keyboard/focus and stale results. Browser boundary injections are test-only and are not proof that a native panel opened. Both build checkers verify package-supplied asset hashes and explicit production/diagnostic shell differences. When native automation is unavailable, retain the mandatory [manual launcher smoke](toolbar-launcher.md#manual-smoke-still-required) and record the gap honestly. Unit-level provider edge cases should not all be repeated in E2E.
 
 ## Release build, manual smoke, and CI
 

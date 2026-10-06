@@ -8,6 +8,7 @@ import { ATTEMPT_LABELS, ERROR_MESSAGES, failureMessage, formatDate } from './pr
 import { useOptionsRuntime } from './use-options-runtime';
 import { Icon } from './Icon';
 import { Disclosure } from './Disclosure';
+import { BrandMark } from './BrandMark';
 
 const AGREEMENT_KEY = 'likedex.privacy-agreement';
 const AGREEMENT_VERSION = 'phase7-v1';
@@ -104,7 +105,7 @@ export function OptionsApp({ client, surface = 'options' }: { client: RuntimeCli
   };
   const needsConnect = disconnected || (auth.status === 'unavailable' && auth.error.detail?.category === 'authentication');
   return <main className={`options-app ${surface === 'sidepanel' ? 'compact-app' : ''}`}>
-    <header className="app-header"><div className="brand"><span className="brand-mark" aria-hidden="true"><Icon name="play" /></span><div><h1>Likedex</h1><p>Your likes, within reach.</p></div></div>
+    <header className="app-header"><div className="brand"><BrandMark /><div><h1>Likedex</h1><p>Your likes, within reach.</p></div></div>
       <div className="header-actions">
         <button onClick={() => { void start(); }} disabled={!agreed || disconnected || !identity || mismatch || active || connecting || starting}>
           <Icon name="sync" className={active || starting ? 'spinning' : ''} />{starting ? 'Requesting sync…' : active ? 'Sync in progress' : 'Sync'}</button>

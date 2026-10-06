@@ -4,7 +4,8 @@ import { startBackgroundRuntime } from '../src/runtime/background';
 
 export default defineBackground(() => {
   startBackgroundRuntime();
-  browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error: unknown) => {
-    console.error('Likedex could not configure toolbar Side Panel behavior.', error);
+  // Explicit false also clears the previous direct-action setting on update.
+  browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {
+    console.error('Likedex could not configure toolbar launcher behavior.');
   });
 });

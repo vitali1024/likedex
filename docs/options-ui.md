@@ -2,6 +2,8 @@
 
 ## Current presentation, 2026-10-04
 
+Shell amendment, 2026-10-06: the toolbar opens a compact launcher, with current-window Open/Close Side Panel and Open Full Library. Full Library is the existing Options app; Side Panel remains quick companion browsing. The popup observes no library/auth/sync data. Shared headers now use the approved smooth Likedex vector instead of the constructed play-circle glyph; functional controls remain in the SVG icon system. [Canonical assets](branding-assets.md) records the two package roles and exact hashes. Chrome 141+ is required. This supersedes the older direct-toolbar shell contract, while historical verification below stays historical.
+
 Options and Side Panel now share the production `RuntimeClient` / `LibraryObserver` composition, dark cyan presentation, explicit connection/sync controls, local query toolbar, bounded cards, direct watch/copy actions, and truthful status/error states. The material below this section is the historical Phase 7 record; its claims that Side Panel is a placeholder and that production Sync remains disabled are superseded by current code and the later release evidence.
 
 - Wide Options uses the library/detail split at 1280px; smaller Options widths use a focused detail route with Back. The Side Panel always uses compact list → one expanded row → focused detail. Back restores query, sort, page, selection/expansion, list/page scroll and invoking focus. Removed/ineligible selection returns to the results region with a notice.

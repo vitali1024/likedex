@@ -1,6 +1,10 @@
 # Likedex implementation plan
 
-Status: future work only. There are **15 numbered phases**, with Phase 11 split into an early identity checkpoint (11A) and final production-readiness checkpoint (11B). No commands, scaffolding, tests, resources, packages, or evidence below exist yet.
+Status: original phased plan retained below. There are **15 numbered phases**, with Phase 11 split into an early identity checkpoint (11A) and final production-readiness checkpoint (11B). Current implementation/evidence is recorded separately in README and release records; phase descriptions are not completion claims.
+
+## Authorized shell amendment, 2026-10-06
+
+Handoff A changes production toolbar → launcher → current-window Side Panel / Full Library. The launcher remains independent of data observation and has exactly two primary destinations. Full Library continues to use Options internally; Side Panel keeps the global model. Chrome 141 is the minimum because Close uses the real API. The human approved live panel window/visibility queries after Chromium returned context window ID −1: scoped extension views plus authoritative SIDE_PANEL contexts replace the invalid context-only assumption. No stored flag or connection is required. Both supplied asset packages are adopted according to [canonical asset roles](branding-assets.md), without regenerated artwork. Existing sync/auth/storage, production approval and diagnostic gates remain unchanged. Launcher unit/browser coverage, exact asset hashes, both artifact checks and full `npm run verify` are required; native toolbar/visual smoke remains human-controlled. No staging, commit or push is authorized by this handoff. Later UI-polish handoffs and release review/data controls remain outside it.
 
 ## Entry gate and ordering
 

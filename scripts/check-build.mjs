@@ -5,6 +5,7 @@ import { Buffer } from 'node:buffer';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PRODUCTION_PROVIDER_VALIDATION_APPROVED } from '../src/runtime/production-gate.ts';
+import { checkCanonicalAssets } from './check-canonical-assets.mjs';
 
 // Import the release decision directly; no source-text/minifier parsing.
 // Production Chromium smoke independently checks the emitted runtime wiring.
@@ -38,7 +39,9 @@ const extensionId = createHash('sha256').update(Buffer.from(manifest.key, 'base6
   .replace(/[0-9a-f]/g, (digit) => String.fromCharCode('a'.charCodeAt(0) + parseInt(digit, 16)));
 assert.equal(extensionId, 'mmefiakgfhddiojfdnkfpfpbkgbfgkgj');
 assert.equal(manifest.action.default_title, 'Open Likedex');
-assert.equal(manifest.action.default_popup, undefined);
+assert.equal(manifest.action.default_popup, 'popup.html');
+assert.equal(manifest.minimum_chrome_version, '141');
+assert.deepEqual(manifest.action.default_icon, { 16: 'action/16.png', 24: 'action/24.png', 32: 'action/32.png' });
 assert.deepEqual(manifest.options_ui, { page: 'options.html', open_in_tab: true });
 assert.equal(manifest.side_panel.default_path, 'sidepanel.html');
 assert.equal(manifest.background.service_worker, 'background.js');
@@ -46,14 +49,34 @@ assert.deepEqual(manifest.icons, {
   16: 'icon/16.png', 32: 'icon/32.png', 48: 'icon/48.png', 128: 'icon/128.png',
 });
 
-for (const path of ['options.html', 'sidepanel.html', 'background.js', ...Object.values(manifest.icons)]) {
+for (const path of ['popup.html', 'options.html', 'sidepanel.html', 'background.js', ...Object.values(manifest.icons), ...Object.values(manifest.action.default_icon)]) {
   assert.ok((await stat(join(output, path))).size > 0, `Missing or empty artifact: ${path}`);
 }
+
+await checkCanonicalAssets(output);
+
+// Inspect the actual popup dependency graph, including any shared chunks.
+// Rendering a launcher must not acquire library/auth/runtime observation code.
+const visitedPopupFiles = new Set();
+async function inspectPopup(path) {
+  if (visitedPopupFiles.has(path)) return;
+  visitedPopupFiles.add(path);
+  const text = await readFile(join(output, path), 'utf8');
+  assert.doesNotMatch(text, /indexedDB|localStorage|AUTH_STATUS_GET|LIBRARY_SNAPSHOT_GET|SYNC_START|youtube\.readonly|googleapis\.com/);
+  const dependencies = path.endsWith('.html')
+    ? [...text.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css))["']/g)].map((match) => match[1])
+    : [...text.matchAll(/(?:from|import)\s*["']([^"']+\.js)["']/g)].map((match) => match[1]);
+  for (const dependency of dependencies) {
+    const resolved = dependency.startsWith('/') ? dependency.slice(1) : join(path.substring(0, path.lastIndexOf('/') + 1), dependency);
+    await inspectPopup(resolved);
+  }
+}
+await inspectPopup('popup.html');
 
 async function inspect(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
-    assert.doesNotMatch(entry.name, /fixture|mock|demo|\.map$|\.test\.|\.spec\./i);
+    assert.doesNotMatch(entry.name, /fixture|mock|demo|\.zip$|\.map$|\.test\.|\.spec\./i);
     if (entry.isDirectory()) await inspect(path);
     else if (/\.(js|html|json)$/.test(path)) {
       const text = await readFile(path, 'utf8');
@@ -72,4 +95,4 @@ async function inspect(directory) {
 }
 
 await inspect(output);
-console.log('Approved production Sync gate, OAuth/Store identity, manifest, entrypoints, icons, and production artifact checks passed.');
+console.log('Approved production Sync gate, OAuth/Store identity, launcher isolation, Chrome 141, manifest, canonical hashes and production artifact checks passed.');

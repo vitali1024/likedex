@@ -31,15 +31,15 @@ This sequence follows Chrome's [OAuth identity setup guide](https://developer.ch
 ## Deadline-controlled: manifest, version, and permissions
 
 - [ ] Product/listing name is Likedex. Reservation version `0.1.0` is already uploaded; every subsequent Store upload must use a strictly higher valid numeric Chrome package version. Never submit `0.0.0`.
-- [ ] Generated production manifest has MV3 service worker, Options entry, explicit toolbar `action`, Side Panel default path and `sidePanel` permission, correct OAuth client/scope, stable identity strategy, and valid icons. Configure action-click panel behavior and omit an action popup.
-- [ ] Pick/document minimum Chrome version based on actual used APIs and smoke testing, not an arbitrary compatibility claim.
+- [ ] Generated production manifest has MV3 service worker, Options entry, toolbar `action.default_popup: popup.html`, Side Panel default path and `sidePanel` permission, correct OAuth client/scope, stable identity strategy and canonical icons. Direct action-click panel behavior is explicitly false; the launcher has exactly two primary destinations.
+- [ ] Verify minimum Chrome version **141**, required by real window-scoped `sidePanel.close()`. Open/getContexts require 116+. Native toolbar/popup/panel lifecycle and light/dark toolbar appearance still require human [launcher smoke](../toolbar-launcher.md#manual-smoke-still-required).
 - [ ] Inspect packaged CSP/code: bundled executable code only; no remote code, development server, source secrets, or fixture switches.
 - [ ] Validate final permissions against behavior and remove unused candidates. [Side Panel documentation](https://developer.chrome.com/docs/extensions/reference/api/sidePanel) is the source for panel/action API compatibility.
 
 | Candidate permission/access | Planned justification | Release check |
 |---|---|---|
 | `identity` | Chrome-managed Google token flow | Connect, cache recovery, disconnect |
-| `sidePanel` | Compact Likedex interface | Native toolbar opens panel |
+| `sidePanel` | Compact Likedex interface | Native toolbar opens launcher; explicit row opens/closes current-window panel |
 | `https://www.googleapis.com/*` host | Read authenticated channel/liked membership/video metadata | Adapter permits only required read endpoints |
 | `https://oauth2.googleapis.com/*` host, if required | Explicit Google revocation | Actual revoke request and error handling |
 
@@ -71,7 +71,7 @@ IndexedDB alone needs no storage permission. Do not request all-sites, history, 
 | Repeated full sync | Complete reconciliation; no unexpected data loss; retained last success on a deliberately interrupted attempt |
 | Local browsing | Search, channel/duration/date filters, seven sorts, pagination and full details work without new API queries |
 | Video actions | Direct YouTube link opens; Copy produces the same link |
-| Surfaces | Options works; native toolbar opens compact Side Panel; expand/detail/Back restores context |
+| Surfaces | Full Library (Options) works; native toolbar opens launcher; Open/Close genuinely toggles this window's compact Side Panel; expand/detail/Back restores context |
 | Export | Valid JSON with expected owner/records/provenance, no credentials |
 | Disconnect/Revoke | Supported remote revoke/cache result and immediate deletion verified independently; no mirror/owner/derived metadata or library browsing remains on success; failures truthful |
 | Reconnect | After Disconnect, any channel requires fresh owner validation and fresh explicit full Sync; mismatch protection applies when an eligible mirror otherwise exists |

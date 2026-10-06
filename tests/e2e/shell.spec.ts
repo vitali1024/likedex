@@ -34,7 +34,7 @@ test('Production extension loads shells, typed runtime, approved gate and restar
     // This checks the real browser API configuration, not native toolbar clicking.
     await expect.poll(() => worker.evaluate(() =>
       (globalThis as unknown as { chrome: typeof browser }).chrome.sidePanel.getPanelBehavior(),
-    )).toEqual({ openPanelOnActionClick: true });
+    )).toEqual({ openPanelOnActionClick: false });
 
     // Both surfaces have live observers. Isolate deliberate worker stops and
     // synthetic recovery data from concurrent UI authorization/status requests.
