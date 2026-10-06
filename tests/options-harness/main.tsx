@@ -4,11 +4,12 @@
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
 import { OptionsApp } from '../../src/options/OptionsApp';
+import type { SyncAttempt } from '../../src/domain/contracts';
 import '../../src/options/options.css';
 import { RuntimeClient } from '../../src/runtime/client';
 import { failure, type RuntimeOperation } from '../../src/runtime/contracts';
 import { optionsAuth, optionsSnapshot } from '../fixtures/options';
-import { attempt, OBSERVED } from '../fixtures/storage';
+import { attempt, NEXT_ATTEMPT_ID, OBSERVED } from '../fixtures/storage';
 
 export interface OptionsTestControl {
   calls: RuntimeOperation[];
@@ -17,6 +18,7 @@ export interface OptionsTestControl {
   releaseReads(): void;
   pendingReads(): number;
   progress(page: number, phase: 'scanning' | 'applying'): void;
+  checkpoint(values: Partial<SyncAttempt>): void;
   invalidate(boundary: 'generation' | 'epoch', broadcast?: boolean): void;
 }
 let mode = new URL(location.href).searchParams.get('mode') ?? 'library';
@@ -36,8 +38,19 @@ const control: OptionsTestControl = { calls, change(next, count) {
   holding.clear(); const waiting = pending; pending = []; waiting.forEach((resolve) => resolve());
 }, pendingReads() { return pending.length; }, progress(page, phase) {
   mode = 'progress';
-  snapshot.sync!.currentAttempt = attempt({ state: phase, pagesAccepted: page, rawItems: page * 50,
+  snapshot.sync!.currentAttempt = attempt({ attemptId: NEXT_ATTEMPT_ID, state: phase, pagesAccepted: page, rawItems: page * 50,
     uniqueMembership: page * 50, safeCommits: page, authEpoch: snapshot.authEpoch, dataGeneration: snapshot.dataGeneration });
+  notify();
+}, checkpoint(values) {
+  mode = 'progress';
+  snapshot.sync!.currentAttempt = attempt({ attemptId: NEXT_ATTEMPT_ID,
+    ...snapshot.sync!.currentAttempt, ...values, authEpoch: snapshot.authEpoch, dataGeneration: snapshot.dataGeneration });
+  snapshot.sync!.lastMirrorChangeRevision = revision + 1;
+  if (values.state === 'success') {
+    snapshot.sync!.latestSuccessfulSync = { ...snapshot.sync!.latestSuccessfulSync!, attemptId: snapshot.sync!.currentAttempt.attemptId,
+      localMembershipCount: snapshot.videos.length, completedAt: values.finishedAt ?? OBSERVED };
+    snapshot.sync!.lastFinalizedMirrorRevision = revision + 1;
+  }
   notify();
 }, invalidate(boundary, broadcast = true) {
   if (boundary === 'generation') snapshot.dataGeneration++;
@@ -71,6 +84,7 @@ const client = new RuntimeClient({
     if (request.operation === 'AUTH_STATUS_GET') {
       if (mode === 'auth-error') return rejected('transport-error');
       const auth = optionsAuth();
+      if (mode === 'unknown-title' && auth.status === 'authorized') delete auth.bootstrap.channelTitle;
       auth.control.revision = revision;
       auth.control.dataGeneration = snapshot.dataGeneration;
       auth.control.authEpoch = snapshot.authEpoch;
@@ -85,8 +99,8 @@ const client = new RuntimeClient({
       if (mode === 'mismatch') return rejected('auth-error', { category: 'owner-mismatch', messageKey: 'owner-mismatch', phase: 'preparing' });
       if (mode === 'loading') await new Promise(() => {});
       if (mode === 'disconnected' || mode === 'connect-failure' || mode === 'connected-empty') return response({ ...snapshot, owner: null, videos: [], sync: null });
-      if (mode === 'active') return response({ ...snapshot, sync: { ...snapshot.sync!, currentAttempt: attempt({ pagesAccepted: 2, rawItems: 60, uniqueMembership: 60 }) } });
-      if (mode === 'later-failure') return response({ ...snapshot, sync: { ...snapshot.sync!, currentAttempt: attempt({ state: 'failure', finishedAt: OBSERVED,
+      if (mode === 'active') return response({ ...snapshot, sync: { ...snapshot.sync!, currentAttempt: attempt({ attemptId: NEXT_ATTEMPT_ID, pagesAccepted: 2, rawItems: 60, uniqueMembership: 60 }) } });
+      if (mode === 'later-failure') return response({ ...snapshot, sync: { ...snapshot.sync!, currentAttempt: attempt({ attemptId: NEXT_ATTEMPT_ID, state: 'failure', finishedAt: OBSERVED,
         error: { category: 'network', messageKey: 'network-failed', phase: 'scanning' } }) } });
       return response(snapshot);
     }

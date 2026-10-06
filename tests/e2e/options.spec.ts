@@ -3,7 +3,8 @@ import { resolve } from 'node:path';
 import { build } from 'vite';
 import { chromium, expect, test, type BrowserContext, type Page } from '@playwright/test';
 import type { OptionsTestControl } from '../options-harness/main';
-import { NOW } from '../fixtures/storage';
+import type { SyncAttempt } from '../../src/domain/contracts';
+import { NOW, OBSERVED } from '../fixtures/storage';
 
 const path = resolve('.output/options-test-composition');
 let context: BrowserContext;
@@ -40,6 +41,128 @@ async function open(mode = 'library', agreement = true, surface = 'options') {
 }
 async function change(page: Page, mode: string, count?: number) {
   await page.evaluate(({ mode, count }) => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.change(mode, count), { mode, count });
+}
+async function checkpoint(page: Page, values: Partial<SyncAttempt>) {
+  await page.evaluate((values) => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.checkpoint(values), values);
+}
+
+for (const surface of ['options', 'sidepanel']) {
+  test(`${surface}: authoritative progress stays mounted across phases and settles into compact success`, async () => {
+    const page = await open('active', true, surface);
+    await page.setViewportSize({ width: surface === 'sidepanel' ? 360 : 1440, height: 900 });
+    const status = page.getByRole('region', { name: 'Synchronization status' });
+    const bar = page.getByRole('progressbar');
+    await expect(bar).not.toHaveAttribute('aria-valuenow');
+    await checkpoint(page, { state: 'scanning', rawItems: 100, uniqueMembership: 95, estimatedTotal: 200, pagesAccepted: 3, safeCommits: 3 });
+    await expect(bar).toHaveAttribute('aria-valuenow', '50');
+    await expect(bar).toHaveAttribute('aria-label', 'Scanning liked videos');
+    await expect(status.getByText('100 of ~200 memberships scanned', { exact: true })).toBeVisible();
+    await expect(status.locator('.notice')).toHaveCount(0);
+    await expect(page.locator('.video-row')).toHaveCount(50);
+    await expect(page.getByLabel('Search library')).toBeEnabled();
+    await page.evaluate(() => {
+      (window as unknown as { observedBar: Element | null }).observedBar = document.querySelector('[role="progressbar"]');
+    });
+    expect(await bar.locator('.sync-progress-fill').evaluate((node) => getComputedStyle(node).transitionDuration)).toBe('0.35s');
+    for (const state of ['applying', 'scanning', 'finalizing'] as const) {
+      await checkpoint(page, { state, rawItems: 175, uniqueMembership: 170, retrying: state === 'scanning' });
+      await expect(bar).toHaveAttribute('aria-valuenow', '88');
+      expect(await bar.evaluate((node) => node === (window as unknown as { observedBar: Element }).observedBar)).toBe(true);
+      await expect(page.locator('.video-row')).toHaveCount(50);
+      await expect(page.getByText('Loading local snapshot…')).toHaveCount(0);
+      if (state === 'scanning') await expect(status.getByRole('status')).toContainText('Retrying a temporary request');
+      await expect(status.locator('.sync-primary')).not.toContainText('Sync complete');
+    }
+    await page.clock.fastForward(500);
+    await page.screenshot({ path: resolve(`.output/handoff-b-${surface}-active.png`), animations: 'disabled' });
+    await checkpoint(page, { state: 'success', retrying: false, finishedAt: OBSERVED, rawItems: 200, uniqueMembership: 195 });
+    await expect(bar).toHaveCount(0);
+    const primary = status.locator('.sync-primary');
+    await expect(primary).toContainText('Sync complete'); await expect(primary).toContainText('62 mirrored memberships');
+    await expect(primary.locator('time')).toHaveCount(1); await expect(primary).toContainText('Updated');
+    await expect(primary).not.toContainText('pages accepted');
+    await expect(status.getByText('Last successful sync:', { exact: false })).toHaveCount(0);
+    await expect(page.locator('.video-row')).toHaveCount(50);
+    await status.getByText('Sync details', { exact: true }).click();
+    await expect(status.getByText('3 pages accepted', { exact: false })).toBeVisible();
+    await expect(status.getByText('195 unique memberships observed', { exact: false })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(status.locator('summary')).toBeFocused();
+    await page.screenshot({ path: resolve(`.output/handoff-b-${surface}-success.png`), animations: 'disabled' });
+    await page.close();
+  });
+
+  test(`${surface}: unknown total, partial failure, and account details retain truth`, async () => {
+    const page = await open('active', true, surface);
+    await page.setViewportSize({ width: surface === 'sidepanel' ? 480 : 1024, height: 900 });
+    const bar = page.getByRole('progressbar');
+    const status = page.getByRole('region', { name: 'Synchronization status' });
+    const account = page.getByRole('region', { name: 'YouTube connection' });
+    await expect(account.getByRole('heading', { name: 'My channel' })).toBeVisible();
+    await expect(account.getByText('YouTube connected · read-only')).toBeVisible();
+    await expect(account.getByText('Channel ID: owner-a')).not.toBeVisible();
+    await account.getByText('Connection details', { exact: true }).focus(); await page.keyboard.press('Enter');
+    await expect(account.getByText('Channel ID: owner-a')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.keyboard.press('Escape'); await expect(account.locator('summary')).toBeFocused();
+    await checkpoint(page, { state: 'preparing', rawItems: 0, uniqueMembership: 0, estimatedTotal: null });
+    await expect(bar).toHaveCount(0); await expect(status.getByRole('status')).toContainText('Checking YouTube access');
+    await checkpoint(page, { state: 'scanning', rawItems: 1750, uniqueMembership: 1700, estimatedTotal: null, safeCommits: 3 });
+    await expect(bar).toBeVisible(); await expect(bar).not.toHaveAttribute('aria-valuenow');
+    await expect(status.locator('.sync-primary')).toContainText('1,750 memberships scanned');
+    await expect(status.locator('.sync-primary')).not.toContainText('%');
+    await expect(status.locator('.notice')).toHaveCount(0);
+    await checkpoint(page, { state: 'finalizing' });
+    await expect(bar).not.toHaveAttribute('aria-valuenow');
+    await expect(status.locator('.sync-primary')).not.toContainText('Sync complete');
+    await checkpoint(page, { state: 'partial', finishedAt: OBSERVED,
+      error: { category: 'network', messageKey: 'network-failed', phase: 'scanning' } });
+    await expect(bar).toHaveCount(0);
+    await expect(status.getByRole('alert')).toContainText('network request failed');
+    await expect(status.locator('.notice')).toContainText('partially updated');
+    await expect(status.locator('.sync-prior')).toContainText('Last successful sync:');
+    await expect(status.locator('.sync-prior')).toContainText('2 mirrored memberships');
+    await expect(page.locator('.video-row')).toHaveCount(50);
+    await change(page, 'unknown-title'); await expect(account.getByRole('heading', { name: 'YouTube channel', exact: true })).toBeVisible();
+    await change(page, 'mismatch');
+    await expect(account.getByText('Local library owner:', { exact: false })).toContainText('owner-a');
+    await expect(account.getByText('Connected channel:', { exact: false })).toContainText('owner-b');
+    await expect(page.getByRole('button', { name: 'Sync', exact: true })).toBeDisabled();
+    await page.close();
+  });
+
+  test(`${surface}: badge fits low, middle and high checkpoints with reduced motion`, async () => {
+    const page = await open('active', true, surface);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const widths = surface === 'sidepanel' ? [360, 480, 320] : [800, 1024, 1200, 1440];
+    const bar = page.getByRole('progressbar');
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const rawItems of [0, 5, 100, 190, 200]) {
+        await checkpoint(page, { rawItems, uniqueMembership: rawItems, estimatedTotal: 200 });
+        await expect(bar).toHaveAttribute('aria-valuenow', String(Math.round(rawItems / 2)));
+        const bounds = await bar.boundingBox(); const badge = await bar.locator('.sync-progress-badge').boundingBox();
+        expect(bounds).not.toBeNull(); expect(badge).not.toBeNull();
+        expect(badge!.x).toBeGreaterThanOrEqual(bounds!.x);
+        expect(badge!.x + badge!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      }
+      await page.getByText('Sync details', { exact: true }).click();
+      const details = page.locator('.sync-disclosure .disclosure-content');
+      await expect(details).toBeVisible();
+      const bounds = await details.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.keyboard.press('Escape');
+    }
+    expect(await bar.locator('.sync-progress-fill').evaluate((node) => getComputedStyle(node).transitionDuration)).toBe('0s');
+    expect(await bar.locator('.sync-progress-badge').evaluate((node) => getComputedStyle(node).transitionDuration)).toBe('0s');
+    await checkpoint(page, { rawItems: 175, uniqueMembership: 175, estimatedTotal: null });
+    await expect(bar).toBeVisible(); await expect(bar).not.toHaveAttribute('aria-valuenow');
+    expect(await bar.locator('.sync-progress-fill').evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
+    await expect(page.getByText('175 memberships scanned', { exact: true })).toBeVisible();
+    await page.close();
+  });
 }
 
 test('first run requires privacy agreement and explicit Connect; pending, denial and retry are truthful', async () => {
@@ -98,7 +221,7 @@ test('local search/filter/sort/page/selection and canonical links; production au
   await expect(page.getByText('YouTube authorization is required. Connect YouTube to continue.', { exact: false })).toBeVisible();
   await expect(page.getByText('Synchronization is temporarily unavailable', { exact: false })).toHaveCount(0);
   await expect(rows).toHaveCount(50);
-  await expect(page.getByText('Last successful sync:', { exact: false })).toBeVisible();
+  await expect(page.locator('.sync-primary')).toContainText('Sync complete');
   expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((c) => c === 'SYNC_START').length)).toBe(1);
   expect(errors).toEqual([]); await page.close();
 });
@@ -143,7 +266,7 @@ test('runtime failure, owner mismatch, active sync and later failure never masqu
   await expect(page.getByText('Connected channel:', { exact: false })).toContainText('owner-b');
   await expect(page.getByRole('button', { name: 'Sync', exact: true })).toBeDisabled();
   await change(page, 'active'); await expect(page.getByRole('status').filter({ hasText: 'Scanning liked videos' })).toBeVisible();
-  await expect(page.getByText('2 pages accepted · 60 unique memberships observed')).toBeVisible();
+  await expect(page.getByText('60 memberships scanned', { exact: true })).toBeVisible();
   const activeReads = await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((c) => c === 'LIBRARY_SNAPSHOT_GET').length);
   await page.clock.fastForward(2000);
   await expect.poll(() => page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((c) => c === 'LIBRARY_SNAPSHOT_GET').length)).toBeGreaterThan(activeReads);
@@ -310,7 +433,7 @@ test('consecutive page revision bursts keep identity, progress and local browsin
       await page.getByLabel('Search library').fill('video'); await expect(page.locator('.video-row')).toHaveCount(10);
     }
     await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
-    await expect(page.getByText(`${number} pages accepted · ${number * 50} unique memberships observed`)).toBeVisible();
+    await expect(page.getByText(`${number * 50} memberships scanned`, { exact: true })).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: 'Scanning liked videos' })).toBeVisible();
     await expect(page.getByText('Loading local snapshot…')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Library unavailable' })).toHaveCount(0);

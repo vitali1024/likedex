@@ -181,6 +181,14 @@ The startup/control barrier performs local expiry and pending-cleanup work first
 
 ## Runtime and surface coordination
 
+### Handoff B presentation contract, 2026-10-06
+
+Both library surfaces derive progress purely from committed attempt `rawItems / estimatedTotal`. `rawItems` counts validated playlist items before video deduplication; optional `pageInfo.totalResults` supplies the provider estimate, retained across accepted pages and persisted with the checkpoint. `uniqueMembership` must not be used as the numerator. Use a positive safe-integer denominator and a nonnegative safe-integer numerator; unusable inputs produce indeterminate progress (invalid counts are explicitly unavailable). Display/ARIA use nearest whole-percent rounding; CSS geometry uses the unrounded ratio clamped to 0–100. Counts label the denominator approximate. No page-size inference, ETA, new request or timed count growth.
+
+Preparing shows phase only. Scanning/applying/finalizing share one mounted progress component, preserving the checkpoint across phase revisions. Finalizing does not synthesize 100% or claim success; durable finalization remains authoritative. Semantic custom progressbar exposes min/max/current and phase/value text; indeterminate omits current value. Decorative fill/badge are hidden from assistive technology and progress counts stay outside live announcements. CSS transitions move fill and badge for 350ms between observed values only; the unknown-total segment is decorative continuous motion. Reduced motion removes both. Clamp badge position independently of fill so it fits narrow panels.
+
+Matching success (attempt ID, owner ID and generation) uses one primary mirrored-membership/update-time summary. Current failure/error and the earlier successful snapshot's count/time remain distinct; active Sync retains earlier success in Sync details. Page/raw/unique counts, provider estimate, timestamps and change counts are secondary details. Suppress the large partial warning only for healthy active work; retain revision provenance and terminal partial warnings. Normal account presentation uses channel name/connected/read-only text, with stable ID in Connection details. Mismatch still exposes both stable IDs and blocks Sync. No DTO, schema, sync state, reconciliation, observer or eligibility contract changes.
+
 Validate request and response envelopes at runtime. Include protocol version, request ID, operation, and typed payload; respond with success/result or failure/domain error. Reject unknown versions/operations and messages from outside the extension; do not expose externally connectable handlers. Never default a malformed response to empty data.
 
 | Operation | Contract |

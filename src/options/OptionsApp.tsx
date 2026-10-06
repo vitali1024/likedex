@@ -1,14 +1,16 @@
 import { useCallback, useRef, useState } from 'react';
-import type { SyncMetadata } from '../domain/contracts';
 import { isActiveAttempt } from '../domain/contracts';
 import { RuntimeClient } from '../runtime/client';
 import type { RuntimeFailure, RuntimeResult } from '../runtime/contracts';
 import { LibraryBrowser } from './LibraryBrowser';
-import { ATTEMPT_LABELS, ERROR_MESSAGES, failureMessage, formatDate } from './presentation';
+import { ATTEMPT_LABELS, failureMessage } from './presentation';
 import { useOptionsRuntime } from './use-options-runtime';
 import { Icon } from './Icon';
-import { Disclosure } from './Disclosure';
 import { BrandMark } from './BrandMark';
+import { ConnectedAccount } from './ConnectedAccount';
+import { SyncStatus } from './SyncStatus';
+
+export { SyncStatus } from './SyncStatus';
 
 const AGREEMENT_KEY = 'likedex.privacy-agreement';
 const AGREEMENT_VERSION = 'phase7-v1';
@@ -25,32 +27,6 @@ export function PrivacyNotice() {
     <p><a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a> · <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">YouTube Terms of Service</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Google account permissions</a></p>
   </details>;
 }
-export function SyncStatus({ sync }: { sync: SyncMetadata | null }) {
-  const attempt = sync?.currentAttempt;
-  const success = sync?.latestSuccessfulSync;
-  const partiallyUpdated = sync !== null && sync.lastMirrorChangeRevision !== sync.lastFinalizedMirrorRevision
-    && (Boolean(success) || (attempt?.safeCommits ?? 0) > 0 || (sync.previousCompletedResult?.safeCommits ?? 0) > 0);
-  const active = attempt ? isActiveAttempt(attempt.state) : false;
-  const tone = active ? 'active' : attempt && attempt.state !== 'success' ? 'warning' : success ? 'success' : 'idle';
-  return <section className="sync-status" aria-label="Synchronization status" data-tone={tone}>
-    <Disclosure className="sync-disclosure" label={<><Icon name={active ? 'sync' : tone === 'success' ? 'check' : 'info'} className={active ? 'spinning' : ''} />
-      <span role="status">{attempt ? ATTEMPT_LABELS[attempt.state] : success ? 'Last sync succeeded' : 'Never synced'}</span></>}>
-      <h3>Synchronization</h3>
-      <p>A full YouTube scan starts only when you choose Sync.</p>
-      <ol className="sync-steps">{(['preparing', 'scanning', 'applying', 'finalizing'] as const).map((state) => <li key={state} data-current={attempt?.state === state}>
-        <Icon name={attempt?.state === state ? 'sync' : 'chevron'} className={attempt?.state === state ? 'spinning' : ''} />{ATTEMPT_LABELS[state]}
-      </li>)}</ol>
-      {success && <p className="success-summary">Latest successful snapshot: {success.localMembershipCount} mirrored memberships.</p>}
-    </Disclosure>
-    {attempt?.retrying && <p role="status">Retrying a temporary request</p>}
-    {attempt && <p className="sync-counts muted">{attempt.pagesAccepted} pages accepted · {attempt.uniqueMembership} unique memberships observed
-      {attempt.finishedAt && ` · ${formatDate(attempt.finishedAt)}`}</p>}
-    {attempt?.error && <p className="error" role="alert">{ERROR_MESSAGES[attempt.error.category]}</p>}
-    {partiallyUpdated && <p className="notice">The local mirror is partially updated; it has not been fully reconciled since these changes.</p>}
-    <p className="muted">Last successful sync: {success ? formatDate(success.completedAt) : 'None recorded'}</p>
-  </section>;
-}
-
 export function OptionsApp({ client, surface = 'options' }: { client: RuntimeClient; surface?: 'options' | 'sidepanel' }) {
   const { library, auth, stamp, refresh } = useOptionsRuntime(client);
   const refreshExpired = useCallback(() => { void refresh(); }, [refresh]);
@@ -115,8 +91,7 @@ export function OptionsApp({ client, surface = 'options' }: { client: RuntimeCli
       {auth.status === 'loading' && <p role="status">Loading connection status…</p>}
       {auth.status === 'unavailable' && <div role="alert"><h2>Connection status unavailable</h2><p>{failureMessage(auth.error)}</p></div>}
       {authValue?.status === 'validation-pending' && <p role="status">Checking YouTube authorization…</p>}
-      {identity?.status === 'authorized' && <><p className="eyebrow">YouTube connected · read-only</p>
-        <h2>{identity.bootstrap.channelTitle || 'YouTube channel'}</h2><p className="channel-id">{identity.bootstrap.channelId}</p>
+      {identity?.status === 'authorized' && <><ConnectedAccount bootstrap={identity.bootstrap} />
         {library.status === 'ready' && !library.snapshot.sync?.currentAttempt && !library.snapshot.sync?.latestSuccessfulSync && <p>Connected, never synced. Use Sync to create a local mirror.</p>}</>}
       {mismatch && identity.status === 'owner-mismatch' && <div role="alert"><h2>Different YouTube channel</h2>
         <p>Local library owner: <span className="channel-id">{identity.localOwnerChannelId}</span></p>

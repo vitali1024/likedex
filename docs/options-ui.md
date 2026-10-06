@@ -2,6 +2,29 @@
 
 ## Current presentation, 2026-10-04
 
+### Handoff B amendment, 2026-10-06
+
+This supersedes the historical page-counter/no-percentage and routinely visible account-ID presentation below. Both surfaces share `ConnectedAccount`, `SyncStatus` and `SyncProgress`. Normal connection prioritizes channel name and connected/read-only text with a small Connection details disclosure for the stable ID. Unknown name remains explicit; owner mismatch still shows both IDs and blocks Sync.
+
+Active scanning/applying/finalizing uses a navy inset HTML/CSS track with cyan-to-blue fill and a clamped edge badge. Pure `deriveSyncProgress` uses committed `rawItems / estimatedTotal`, including duplicate-video membership items. Geometry keeps the ratio clamped to 0–100; text/ARIA round to the nearest whole percent. The total is marked approximate. Unknown/zero/invalid totals are indeterminate with observed counts and no fake percent/current value/ETA. Preparing uses phase only. Fill/badge transition for 350ms between checkpoints, with no data timers; reduced motion disables transitions and decorative unknown-total motion. Phase/retry announcements stay separate from progress internals/counts.
+
+Durable matching success becomes one compact success/mirrored-membership/update-time summary. Technical pages/raw/unique counts, estimate, timestamps and change counts live in Sync details. Terminal failures retain typed alert/error, revision-based partial warning and prior successful snapshot time/count. Healthy active work suppresses the large partial notice without altering stored provenance. Prior success remains in details during active work. Shared observation, eligibility, stale-response fencing, library rows/controls and identity remain stable.
+
+Automated browser coverage includes both surfaces, 360/480px Side Panel (plus 320px fixture), 800/1024/1200/1440px Full Library, low/middle/high badges, determinate/indeterminate, phase/checkpoint stability, success/failure/account disclosures and reduced motion. This amendment does not claim human real-account smoke or release acceptance. The supplied neon image is inspiration only; no raster progress asset, image background, canvas or new dependency is used.
+
+#### Handoff B human smoke still required
+
+Use the exact final generated **`C:\Dev\likedex\.output\chrome-mv3`** package. Record build/source state, Chrome version, date/time and actual results; uncommitted source must be identified as such. This procedure has not been marked passed by the agent.
+
+1. Reload/load this production package in `chrome://extensions`; open Full Library with an existing eligible real mirror.
+2. Confirm stable channel name/connected/read-only text, hidden routine ID and accessible Connection details containing the ID.
+3. Start a real Sync. Preparing shows checking; when a positive provider estimate arrives, confirm semantic progress, approximate denominator and percentage based on raw scanned membership items. Observe several real checkpoints; no text-only page-counter progress or invented ETA dominates.
+4. Confirm scanning/applying/finalizing preserve progress, with no skeleton thrashing or large healthy-active partial warning. Search/filter/sort/page/library remain usable and account identity stays stable.
+5. Wait for durable success: progress settles into one compact summary with mirrored membership count and update time, without a duplicate primary last-success timestamp. A real 100% checkpoint before success still says finalizing/scanning.
+6. Open the native Side Panel during an observation; check narrow widths, readable counts and an unclipped percentage badge. Enable system/browser reduced motion and confirm progress information remains complete without nonessential movement.
+7. Open Sync details by keyboard; check useful pages/raw/unique/estimate/timestamp/change diagnostics and Escape/focus restoration.
+8. If feasible, use a separate failure fixture/harness to check current failure/partial/interruption, retained earlier success and terminal partial warning; never manufacture a real-account failure or change provider trust to exercise UI. Check screen-reader phase/progress/error behavior manually.
+
 Shell amendment, 2026-10-06: the toolbar opens a compact launcher, with current-window Open/Close Side Panel and Open Full Library. Full Library is the existing Options app; Side Panel remains quick companion browsing. The popup observes no library/auth/sync data. Shared headers now use the approved smooth Likedex vector instead of the constructed play-circle glyph; functional controls remain in the SVG icon system. [Canonical assets](branding-assets.md) records the two package roles and exact hashes. Chrome 141+ is required. This supersedes the older direct-toolbar shell contract, while historical verification below stays historical.
 
 Options and Side Panel now share the production `RuntimeClient` / `LibraryObserver` composition, dark cyan presentation, explicit connection/sync controls, local query toolbar, bounded cards, direct watch/copy actions, and truthful status/error states. The material below this section is the historical Phase 7 record; its claims that Side Panel is a placeholder and that production Sync remains disabled are superseded by current code and the later release evidence.

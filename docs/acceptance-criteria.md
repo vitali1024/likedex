@@ -33,7 +33,9 @@ Release evidence status, **2026-10-04**: **live provider validation COMPLETE / A
 | AC-SYNC-002 | Every new attempt starts at the first remote page, including after previous success, failure, or interruption. | U |
 | AC-SYNC-003 | Start persists preparing and acknowledges an attempt before a held provider request resolves; controlled fixture acknowledgement is within 1 second. | R |
 | AC-SYNC-004 | Duplicate starts from Options and Side Panel yield one active attempt and one enumeration; both surfaces receive the same attempt ID. | R, E |
-| AC-SYNC-005 | Checking/scanning/applying/finalizing/terminal states follow the documented transitions; page/item progress reflects committed evidence, with no invented percent complete. | U, E |
+| AC-SYNC-005 | Checking/scanning/applying/finalizing/terminal states follow durable transitions. Active determinate progress uses rawItems / positive provider-estimated total (including duplicate-video items), nearest whole-percent rounding and 0–100 visual clamp. Approximate denominator is labeled; null/zero/invalid total is indeterminate with no fake current value/ETA. Preparing shows phase only; finalizing preserves its checkpoint without declaring completion. Both surfaces retain stable browsing through updates. | U, E |
+| AC-SYNC-014 | Matching durable success settles into one compact summary with mirrored membership count/update time and no repeated primary last-success timestamp. Terminal failure/partial/interruption retains the earlier successful count/time and typed error. Page/raw/unique/change metrics are in Sync details. Healthy active work suppresses the partial warning; terminal unreconciled revision warnings remain. | U, E |
+| AC-IDENTITY-006 | Normal connected account prioritizes channel name (truthful fallback), connected/read-only text and optional keyboard-accessible Connection details containing stable ID. Raw ID is not routinely visible; mismatch still exposes both IDs and blocks Sync. | U, E |
 | AC-SYNC-006 | A network failure before any safe commit reports failure; after safe commits reports partial, retains those updates, and performs no pruning. | U, S |
 | AC-SYNC-007 | Ordinary later failed/interrupted sync preserves latestSuccessfulSync while the dataset remains eligible; cleanup removes associated metadata and reports its actual reason, not successful empty sync. | S, E |
 | AC-SYNC-008 | Worker reinitialization marks prior-instance active work interrupted; retry begins at page one; persisted terminal success stays success. | R, S |
@@ -113,6 +115,7 @@ Release evidence status, **2026-10-04**: **live provider validation COMPLETE / A
 | AC-A11Y-002 | Dialog has role/title/description, safe initial focus, trap where modal, Escape/cancel, and focus restoration; destructive confirmation is explicit. | E, M |
 | AC-A11Y-003 | Popovers/selects are labeled and keyboard-dismissable; screen reader announces major sync changes and readable errors without per-item chatter. | E, M |
 | AC-A11Y-004 | Reduced-motion mode removes nonessential movement; actions remain usable with animations disabled and at 200% zoom/short height. | E, M |
+| AC-A11Y-005 | Both surfaces expose labeled progressbar min/max/current and truthful estimated value text; unknown total omits aria-valuenow. Decorative internals/counts are outside live announcements. Fill/badge fit low/middle/high percentages at 360/480px Side Panel and 800/1024/1200/1440px Full Library. Reduced motion disables checkpoint transitions and indeterminate animation while preserving information. | U, E, M |
 
 ## Privacy, verification, and release
 

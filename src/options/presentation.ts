@@ -33,10 +33,28 @@ export function failureMessage(error: RuntimeFailure): string {
   return message + (error.cleanup ? ` Local deletion ${error.cleanup.deletion}; authorization-cache cleanup ${error.cleanup.cacheInvalidation}; cleanup status save ${error.cleanup.persistence}.` : '');
 }
 export const ATTEMPT_LABELS: Record<SyncAttempt['state'], string> = {
-  preparing: 'Checking YouTube access', scanning: 'Scanning liked videos', applying: 'Applying local updates',
-  finalizing: 'Finalizing synchronization', success: 'Sync completed', partial: 'Sync stopped — mirror partially updated',
+  preparing: 'Checking YouTube access', scanning: 'Scanning liked videos', applying: 'Applying updates',
+  finalizing: 'Finalizing sync', success: 'Sync complete', partial: 'Sync stopped — mirror partially updated',
   failure: 'Sync failed', interrupted: 'Sync interrupted',
 };
+export type SyncProgressValue = {
+  mode: 'determinate'; rawItems: number; estimatedTotal: number; percentage: number; widthPercent: number;
+} | {
+  mode: 'indeterminate'; rawItems: number | null; estimatedTotal: null; percentage: null; widthPercent: null;
+};
+
+// Counts come from committed membership pages, including distinct items for the
+// same video. The provider total is an estimate, never a completion authority.
+// Text/ARIA round to the nearest integer; geometry retains the clamped ratio.
+export function deriveSyncProgress({ rawItems, estimatedTotal }: Pick<SyncAttempt, 'rawItems' | 'estimatedTotal'>): SyncProgressValue {
+  const observed = Number.isSafeInteger(rawItems) && rawItems >= 0 ? rawItems : null;
+  if (observed === null || estimatedTotal === null || !Number.isSafeInteger(estimatedTotal) || estimatedTotal <= 0) {
+    return { mode: 'indeterminate', rawItems: observed, estimatedTotal: null, percentage: null, widthPercent: null };
+  }
+  const widthPercent = Math.min(100, Math.max(0, (observed / estimatedTotal) * 100));
+  return { mode: 'determinate', rawItems: observed, estimatedTotal, percentage: Math.round(widthPercent), widthPercent };
+}
+export function formatCount(value: number): string { return value.toLocaleString(); }
 export function formatDate(value: string | null): string {
   return value === null ? 'Unknown' : new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
