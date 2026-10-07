@@ -9,6 +9,8 @@ import { LibraryRepository, StorageError } from '@/src/storage/repository';
 import { SynchronizationService } from '@/src/sync/service';
 import { RuntimeClient } from '@/src/runtime/client';
 import { RuntimeCoordinator, type LifecycleScheduler } from '@/src/runtime/coordinator';
+import { createOptionsRuntime, type AuthObservation } from '@/src/options/runtime';
+import type { LibraryObservation } from '@/src/runtime/observer';
 import { PRODUCTION_PROVIDER_VALIDATION_APPROVED } from '@/src/runtime/production-gate';
 import { type RuntimeOperation, type RuntimeRequest, type RevisionEvent, resultSchemas } from '@/src/runtime/contracts';
 import { attempt, NOW, OBSERVED, owner, success, video } from '../fixtures/storage';
@@ -83,6 +85,34 @@ async function setup(options: { seed?: boolean; connected?: boolean; gate?: unkn
     clock, setNow: (value: string) => { now = value; } };
 }
 async function records(db: LikedexDatabase) { return Promise.all(db.tables.map((table) => table.toArray())); }
+
+describe('Hidden surface observes real cross-surface deletion fences', () => {
+  it.each(['clear', 'disconnect'] as const)('%s deletes durable data and fences hidden library/identity before return', async (action) => {
+    const h = await setup({ seed: true });
+    const libraries: LibraryObservation[] = [], identities: AuthObservation[] = [];
+    const surface = createOptionsRuntime(h.client(), { library: (state) => libraries.push(state),
+      auth: (state) => identities.push(state), stamp: () => {} }, { now: h.clock, scheduler: h.timers.scheduler });
+    try {
+      await surface.resumeIfNeeded();
+      await vi.waitFor(() => {
+        expect(libraries.at(-1)).toMatchObject({ status: 'ready', snapshot: { videos: [expect.objectContaining({ videoId: 'video-a' })] } });
+        expect(identities.at(-1)).toMatchObject({ status: 'ready', value: { status: 'authorized' } });
+      });
+      surface.suspend();
+      if (action === 'clear') await h.repository.clearLocalData((await h.repository.readSnapshot(h.clock)).fence);
+      else expect(await h.client().request('AUTH_DISCONNECT')).toMatchObject({ ok: true, result: { completed: true } });
+      expect(libraries.at(-1)).not.toMatchObject({ status: 'ready' });
+      expect(identities.at(-1)).toEqual({ status: 'loading' });
+      const durable = await h.repository.readSnapshot(h.clock);
+      expect(durable.videos).toEqual([]); expect(durable.owner).toBeNull(); expect(durable.sync).toBeNull();
+      expect(durable.control.lastCleanupReason).toBe(action);
+      const before = libraries.length;
+      await surface.resumeIfNeeded();
+      await vi.waitFor(() => expect(identities.at(-1)).toMatchObject({ status: 'ready', value: { status: action === 'disconnect' ? 'auth-required' : 'authorized' } }));
+      expect(libraries.slice(before).filter((state) => state.status === 'ready').every((state) => state.snapshot.videos.length === 0)).toBe(true);
+    } finally { surface.dispose(); }
+  });
+});
 
 describe('Runtime production gate and validation (AC-SYNC-013; AC-SYNC-011)', () => {
   it.each([false, true])('safe Connect diagnostics are included only by explicit validation composition: %s', async (diagnostics) => {

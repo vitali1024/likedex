@@ -737,35 +737,191 @@ for (const boundary of ['generation', 'epoch'] as const) {
   });
 }
 
-test('hidden surface drops cached data and ignores held replies until a fresh visible observation', async () => {
+test('hidden active surface retains eligible rows, pauses polling and catches up once on visibility plus focus', async () => {
   const page = await open('active');
   await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  const before = await requestCounts(page);
   await page.evaluate(() => {
     const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
-    h.holdReads(); h.progress(3, 'applying');
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
     document.dispatchEvent(new Event('visibilitychange'));
-    h.releaseReads();
+    h.progress(3, 'applying'); h.holdReads();
   });
-  await expect(page.locator('.video-row')).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'My channel' })).toHaveCount(0);
-  await page.evaluate(() => {
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
+  await page.clock.fastForward(10_000);
+  expect(await requestCounts(page)).toEqual(before);
+  await expect(page.locator('.video-row')).toHaveCount(50);
+  await setVisibility(page, 'visible');
+  expect(await requestCounts(page)).toEqual({ snapshot: before.snapshot + 1, auth: before.auth + 1 });
   await expect(page.locator('.video-row')).toHaveCount(50);
   await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
+  await expect(page.getByRole('region', { name: 'Synchronization status' })).toContainText('150 memberships scanned');
+  await expect(page.locator('.video-row')).toHaveCount(50);
+  await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  expect(await requestCounts(page)).toEqual({ snapshot: before.snapshot + 1, auth: before.auth + 1 });
+  await page.clock.fastForward(2000);
+  expect(await requestCounts(page)).toEqual({ snapshot: before.snapshot + 2, auth: before.auth + 1 });
   await page.close();
 });
 
-test('auth alone fences a cached library on a dropped context broadcast and late library response', async () => {
-  const page = await open('active');
+async function requestCounts(page: Page) {
+  return page.evaluate(() => {
+    const calls = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls;
+    return { snapshot: calls.filter((operation) => operation === 'LIBRARY_SNAPSHOT_GET').length,
+      auth: calls.filter((operation) => operation === 'AUTH_STATUS_GET').length };
+  });
+}
+async function setVisibility(page: Page, value: 'hidden' | 'visible') {
+  await page.evaluate((value) => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value });
+    document.dispatchEvent(new Event('visibilitychange'));
+    if (value === 'visible') window.dispatchEvent(new Event('focus'));
+  }, value);
+}
+async function observeLifecycle(page: Page) {
+  await page.evaluate(() => {
+    const violations: string[] = [];
+    (window as unknown as { lifecycleViolations: string[] }).lifecycleViolations = violations;
+    new MutationObserver(() => {
+      if (!document.querySelector('.video-row')) violations.push('rows disappeared');
+      if (document.querySelector<HTMLInputElement>('[aria-label="Search library"]')?.disabled) violations.push('search disabled');
+      if (!document.querySelector('.connection h2')) violations.push('identity disappeared');
+      if (document.querySelector('.loading-state')) violations.push('skeleton appeared');
+      if (/Loading (local snapshot|sync status|connection status)|Checking YouTube authorization/.test(document.querySelector('main')!.textContent!)) violations.push('loading/checking appeared');
+      if (document.querySelector('.empty.error')) violations.push('unavailable/error');
+    }).observe(document.querySelector('main')!, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
+}
+async function expectNoLifecycleViolations(page: Page) {
+  expect(await page.evaluate(() => (window as unknown as { lifecycleViolations: string[] }).lifecycleViolations)).toEqual([]);
+}
+
+for (const surface of ['options', 'sidepanel']) {
+  test(`${surface}: five eligible hide/show cycles retain rows, account, Sync and browsing state with zero reads`, async () => {
+    const page = await open('library', true, surface);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+    await change(page, 'library', 160);
+    await expect(page.locator('.results-footer')).toContainText('160 available videos');
+    await page.getByLabel('Search library').fill('video');
+    await page.getByText('Filter library', { exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Travel', exact: true }).check();
+    await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+    await choose(page, 'Sort', 'Title A–Z');
+    await page.getByRole('button', { name: 'Next page' }).click();
+    await page.locator('.video-row').first().click();
+    const selected = await page.locator('.video-card[data-selected="true"] .video-row').getAttribute('data-video-id');
+    await page.getByText('Filter library', { exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Music', exact: true }).check();
+    await page.locator('.results-scroll').evaluate((node) => { node.scrollTop = 300; });
+    const scroll = await page.locator('.results-scroll').evaluate((node) => node.scrollTop);
+    const chips = await page.locator('.active-filters').textContent();
+    const before = await requestCounts(page);
+    const rows = await page.locator('.video-row').allTextContents();
+    const summary = await page.getByRole('region', { name: 'Synchronization status' }).textContent();
+    await observeLifecycle(page);
+    for (let i = 0; i < 5; i++) {
+      await setVisibility(page, 'hidden'); await page.clock.fastForward(2000); await setVisibility(page, 'visible');
+      expect(await requestCounts(page)).toEqual(before);
+      expect(await page.locator('.video-row').allTextContents()).toEqual(rows);
+      await expect(page.getByLabel('Search library')).toHaveValue('video');
+      expect(await page.locator('.video-card[data-selected="true"] .video-row').getAttribute('data-video-id')).toBe(selected);
+      expect(await page.locator('.results-scroll').evaluate((node) => node.scrollTop)).toBe(scroll);
+      expect(await page.locator('.active-filters').textContent()).toBe(chips);
+      await expect(page.getByRole('checkbox', { name: 'Music', exact: true })).toBeChecked();
+      expect(await page.getByRole('region', { name: 'Synchronization status' }).textContent()).toBe(summary);
+      await expectNoLifecycleViolations(page);
+    }
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    expect(await requestCounts(page)).toEqual(before);
+    await setVisibility(page, 'hidden'); await page.clock.fastForward(3_600_000); await setVisibility(page, 'visible');
+    expect(await requestCounts(page)).toEqual(before);
+    await expectNoLifecycleViolations(page); await page.close();
+  });
+  test(`${surface}: hidden active Sync with no revision uses one snapshot catch-up and zero auth reads`, async () => {
+    const page = await open('active', true, surface);
+    await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+    const before = await requestCounts(page); await observeLifecycle(page);
+    await setVisibility(page, 'hidden'); await page.clock.fastForward(10_000);
+    expect(await requestCounts(page)).toEqual(before);
+    await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.holdReads());
+    await setVisibility(page, 'visible');
+    expect(await requestCounts(page)).toEqual({ snapshot: before.snapshot + 1, auth: before.auth });
+    await expectNoLifecycleViolations(page);
+    await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
+    await expect(page.locator('.video-row')).toHaveCount(50);
+    expect(await requestCounts(page)).toEqual({ snapshot: before.snapshot + 1, auth: before.auth });
+    await expectNoLifecycleViolations(page); await page.close();
+  });
+  test(`${surface}: hidden expiry removes all row/link actions before visible reuse`, async () => {
+    const page = await open('library', true, surface);
+    await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+    await page.locator('.video-row').first().click();
+    await setVisibility(page, 'hidden');
+    await page.clock.setSystemTime(new Date('2026-10-16T00:00:00.000Z'));
+    await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.holdReads());
+    await setVisibility(page, 'visible');
+    await expect(page.locator('.video-row')).toHaveCount(0);
+    await expect(page.locator('a[href*="youtube.com/watch"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Copy link/ })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'My channel' })).toHaveCount(0);
+    await expect(page.getByLabel('Search library')).toBeDisabled();
+    await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
+    await expect(page.locator('.video-row')).toHaveCount(0); await page.close();
+  });
+  for (const boundary of ['generation', 'epoch'] as const) {
+    test(`${surface}: hidden ${boundary} invalidation never revives old rows or identity`, async () => {
+      const page = await open('library', true, surface);
+      await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
+      await setVisibility(page, 'hidden');
+      await page.evaluate((boundary) => {
+        const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
+        h.holdReads(); h.invalidate(boundary);
+      }, boundary);
+      await expect(page.locator('.video-row')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: 'My channel' })).toHaveCount(0);
+      await setVisibility(page, 'visible');
+      await expect(page.locator('.video-row')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: 'My channel' })).toHaveCount(0);
+      await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
+      await expect(page.getByText('Connected, never synced.', { exact: false })).toBeVisible();
+      await expect(page.locator('.video-row')).toHaveCount(0); await page.close();
+    });
+  }
+}
+
+test('Full Library and companion surface retain independent views across browser foreground changes', async () => {
+  const full = await open(); const panel = await open('library', true, 'sidepanel');
+  await expect(full.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: 'My channel' })).toBeVisible();
+  await observeLifecycle(full); await observeLifecycle(panel);
+  const other = await context.newPage(); await other.goto('about:blank');
+  const before = await requestCounts(full), panelBefore = await requestCounts(panel);
+  const observedVisibility: string[] = [];
+  for (let i = 0; i < 5; i++) {
+    await other.bringToFront(); observedVisibility.push(await full.evaluate(() => document.visibilityState));
+    await full.bringToFront(); observedVisibility.push(await full.evaluate(() => document.visibilityState));
+    await expect(full.locator('.video-row')).toHaveCount(50); await expect(panel.locator('.video-row')).toHaveCount(50);
+    expect(await requestCounts(full)).toEqual(before); expect(await requestCounts(panel)).toEqual(panelBefore);
+    await expectNoLifecycleViolations(full); await expectNoLifecycleViolations(panel);
+  }
+  console.log('Foreground API visibility states:', observedVisibility.join(', '));
+  // Headless Chromium may keep all extension pages visible. Deterministic
+  // visibility tests above cover the transition; native Side Panel is manual.
+  await setVisibility(full, 'hidden'); await expect(panel.locator('.video-row')).toHaveCount(50);
+  await setVisibility(full, 'visible'); expect(await requestCounts(full)).toEqual(before);
+  await expectNoLifecycleViolations(full); await expectNoLifecycleViolations(panel);
+  await other.close(); await panel.close(); await full.close();
+});
+
+test('explicit refresh auth fences a cached library on a dropped context broadcast and late library response', async () => {
+  const page = await open();
   await expect(page.getByRole('heading', { name: 'My channel' })).toBeVisible();
   await page.evaluate(() => {
     const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
     h.holdReads(['LIBRARY_SNAPSHOT_GET']); h.invalidate('generation', false);
-    window.dispatchEvent(new Event('focus'));
   });
+  await page.getByRole('button', { name: 'Sync', exact: true }).click();
   await expect(page.locator('.video-row')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'My channel' })).toHaveCount(0);
   await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());

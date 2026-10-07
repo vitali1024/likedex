@@ -15,7 +15,7 @@ Status: planned. No package scripts, tests, CI, passing results, or evidence log
 | `npm run verify:storage` | Repository transactions, snapshots, rollback, fence enforcement |
 | `npm run verify:auth` | Connect/token recovery/identity/lockout/revocation and periodic/external-authorization validation contracts |
 | `npm run verify:sync` | Domain state machine, trust gate, retry policy, critical reconciliation/storage regressions |
-| `npm run verify:runtime` | Typed messages, durable start/recovery and cross-surface revisions |
+| `npm run verify:runtime` | Typed messages, durable start/recovery, cross-surface revisions and deterministic same-document Options lifecycle policy |
 | `npm run verify:ui` | Local query, UI state and focused component behavior |
 | `npm run verify:data` | Eligible export, Clear, Disconnect, freshness expiry and cleanup races/postconditions |
 | `npm run build` | Real production extension build, never a fixture build |
@@ -26,6 +26,8 @@ Status: planned. No package scripts, tests, CI, passing results, or evidence log
 Targeted commands reuse subsets of the same tests; they are not divergent alternate test frameworks. `verify` need not run the same suite multiple times through every alias. Manual external OAuth/Store checks are recorded separately and must not be misrepresented as automated verify results.
 
 ## Risk by layer
+
+**Same-document lifecycle (AC-LIFECYCLE-001–003):** use injected clock/scheduler and held coherent responses to verify idle zero-read retention, focus/visibility coalescing, hidden timer suspension, one active-Sync catch-up, same-context deferred revisions, newer-revision rereads, generation/auth-epoch/authorization gates, expiry, backward clock, explicit retry and actual remount. Browser component tests monitor DOM mutations through repeated switches and assert request deltas, retained query/draft/selection/scroll/account/Sync, independent surfaces and removed expired actions. Exercise real browser foreground APIs; document when headless Chromium leaves extension pages visible. Do not label ordinary Side Panel route harnesses as native Side Panel evidence. Human production smoke and fresh independent review remain separate release gates. See [lifecycle evidence and smoke checklist](lifecycle-retention-fix.md).
 
 **Unit/domain:** pure state transitions; full-scan policy; capability construction; unknown metadata; available-only queries; all seven sorts and tie/null behavior; filter/date/duration boundaries; page reset/clamp; error-to-user-state mapping. Deterministic clocks/randomness make retries, timeouts, and attempt outcomes testable without real sleeps.
 

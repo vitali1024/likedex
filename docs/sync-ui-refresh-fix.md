@@ -1,5 +1,7 @@
 # Sync UI refresh and transient snapshot investigation
 
+Later lifecycle supersession, **2026-10-07**: [same-document eligible observation retention](lifecycle-retention-fix.md) replaces the hidden-disposal contract and focus-driven unconditional reads recorded here. Same-context Sync revision stability, stale-reply/context/deadline/clock fences and the transaction-clock correction remain intact. This document's original investigation, verification counts and human-reported Sync smoke remain historical evidence; they do not establish production tab-switch smoke for the later correction.
+
 Maker investigation on 2026-10-05 against `main`, HEAD `3ec9f5143df135ae194e98db9c5810274aec042a`. HEAD is identical to the recording's analyzed source commit; there are no subsequent commits. The initial working tree contained only untracked `demo/`, preserved without modification. No staging, commit, push, agent-run live account operation or release approval occurred. The human subsequently reported a successful post-fix live-account smoke test, recorded separately below.
 
 ## Confirmed causes

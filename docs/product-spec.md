@@ -64,6 +64,8 @@ View details opens a focused panel route with Back, larger thumbnail, full title
 
 Both surfaces observe the same connection and sync domain state. They can have independent queries and selections. Neither may infer global success from its own spinner ending.
 
+Same-document tab visibility changes retain eligible in-memory library and auth observations, including their authoritative Sync metadata and browsing state. A short ordinary return shows the same ready UI immediately, with no skeleton, connection check, Sync loading, disabled controls or count reset, and no unnecessary idle snapshot/auth reads. Hidden surface polling pauses; an active Sync catches up once on return while eligible rows remain visible. Deadline, backward-clock and context guards run before reuse; generation/auth-epoch changes, cleanup, authorization invalidity and expiry fence immediately. Real document destruction/remount still requires initial authoritative loading. No persistent UI cache is added. See the [lifecycle contract](lifecycle-retention-fix.md).
+
 ## Settings and data controls
 
 Expose only implemented actions: account/connection status, Disconnect YouTube, Export Data, Clear Local Data, privacy/read-only information, and meaningful product/build version. No placeholders, invented storage figures, sync history, or diagnostics dashboard.

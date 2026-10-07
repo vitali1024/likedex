@@ -61,12 +61,17 @@ Release evidence status, **2026-10-04**: **live provider validation COMPLETE / A
 
 ## Storage and local library
 
+Current lifecycle amendment, 2026-10-07: the same-document retention contract below supersedes the historical hidden-surface disposal expectation; expiry/authorization/clock/context gates remain required.
+
 | ID | Observable acceptance condition | Layer |
 |---|---|---|
 | AC-STORAGE-001 | Browser/worker restart preserves an eligible mirror and metadata without token persistence; expiry or pending cleanup is enforced before exposing data, and no removed owner/attempt/success metadata is restored. | S, E |
 | AC-STORAGE-002 | Page upserts/checkpoint/revision are atomic; a failed write cannot claim accepted progress; retry cannot double-count a page. | S |
 | AC-STORAGE-003 | Failed storage reads/writes show typed errors; a failure to save error state is disclosed rather than represented as durable success/failure. | S, R |
 | AC-STORAGE-004 | Snapshot readers see a coherent revision and owner; out-of-order response arrival cannot regress rendered state. | S, R |
+| AC-LIFECYCLE-001 | Five ordinary same-document idle hide/show cycles and focus alone retain eligible rows, auth identity, snapshot-derived Sync summary, query/filter/sort/page/selection/detail/scroll/draft/chips without loading, disabled controls or count reset. Snapshot/auth request deltas are zero. Initial mount/remount still loads authoritative observations. | U, E, M |
+| AC-LIFECYCLE-002 | Hidden UI timers pause while revision subscriptions survive. Active Sync return catches up with one snapshot read without blanking eligible rows, then restores visible polling. Same-context hidden revisions coalesce into one catch-up; focus following visibility adds no duplicate reads. Genuine newer revisions during a read retain stale-response rejection and necessary rereads. | U, E, M |
+| AC-LIFECYCLE-003 | Generation/auth-epoch or authorization invalidation while hidden immediately fences rows/identity and held replies; old data never reappears on return. Expiry and backward-clock checks run synchronously before visible reuse/actions. Clear/Disconnect fences are exercised through their authoritative contexts; explicit Connect/Sync acknowledgement recovery/Retry/expiry refresh remain effective. No persistent UI cache, automatic Sync, background polling or new permission. | U, R, E, M |
 | AC-STORAGE-005 | Repeated attempts retain only current/prior result and latest success, without implementing an unbounded sync history. | S |
 | AC-LIBRARY-001 | After the shared eligibility gate, search/filter/sort/page/details use eligible local snapshots and issue zero YouTube API calls themselves. Session/periodic authorization checks are separate; no browsing survives successful Disconnect. | U, E |
 | AC-LIBRARY-002 | Primary list includes only available records; no-available differs from no membership and no search matches. | U, E |

@@ -7,7 +7,7 @@ type Snapshot = RuntimeResult<'LIBRARY_SNAPSHOT_GET'>;
 export type LibraryObservation = { status: 'loading' } | { status: 'ready'; snapshot: Snapshot }
   | { status: 'unavailable'; error: RuntimeFailure };
 
-// Reusable surface plumbing only; query/navigation/presentation remain future UI.
+// Surface observation only; query/navigation/presentation belong to the UI.
 export class LibraryObserver {
   private state: LibraryObservation = { status: 'loading' };
   private minimumRevision = -1;
@@ -15,7 +15,10 @@ export class LibraryObserver {
   private reading: Promise<void> | null = null;
   private dirty = false;
   private readEpoch = 0;
+  private activeReadEpoch = 0;
   private stopped = false;
+  private suspended = false;
+  private needsRefresh = true;
   private cancelTimer: (() => void) | null = null;
   private lastClockSeen: string;
   private readonly unsubscribe: () => void;
@@ -38,10 +41,12 @@ export class LibraryObserver {
     if (this.context === null || event.dataGeneration !== this.context.dataGeneration
       || event.authEpoch !== this.context.authEpoch) this.set({ status: 'loading' });
     this.context = event;
-    void this.refresh();
+    this.needsRefresh = true;
+    if (this.reading !== null) this.dirty = true;
+    if (!this.suspended) void this.refresh(false);
   }
   private set(state: LibraryObservation): void { this.state = state; if (!this.stopped) this.publish(state); }
-  private expireBeforeUse(): void {
+  expireBeforeUse(): void {
     const now = this.now();
     if (now < this.lastClockSeen) {
       this.set({ status: 'unavailable', error: failure('data-unavailable') });
@@ -53,9 +58,28 @@ export class LibraryObserver {
       this.set({ status: 'unavailable', error: failure('data-unavailable') });
     }
   }
-  // Surfaces call on mount/reconnection and focus/visibility resume. Expiration
-  // happens synchronously before any cached Authorized Data can be reused.
+  // Explicit refresh/retry still forces observation. Lifecycle re-entry uses
+  // resumeIfNeeded so equivalent focus/visibility signals cannot dirty a read.
   resume(): Promise<void> { this.expireBeforeUse(); return this.refresh(); }
+  suspend(): void {
+    if (this.stopped || this.suspended) return;
+    this.expireBeforeUse();
+    this.suspended = true;
+    const attempt = this.state.status === 'ready' ? this.state.snapshot.sync?.currentAttempt : null;
+    if (attempt && isActiveAttempt(attempt.state)) this.needsRefresh = true;
+    this.cancelTimer?.(); this.cancelTimer = null;
+  }
+  resumeIfNeeded(): Promise<void> {
+    if (this.stopped) return Promise.resolve();
+    this.suspended = false;
+    this.expireBeforeUse();
+    // A gate may have fenced a read while hidden. Coalescing must not turn
+    // that rejected response into the only attempted recovery observation.
+    if (this.reading !== null && this.activeReadEpoch !== this.readEpoch) this.dirty = true;
+    if (this.needsRefresh || this.state.status !== 'ready') return this.refresh(false);
+    if (this.cancelTimer === null) this.arm();
+    return this.reading ?? Promise.resolve();
+  }
   // A companion authoritative auth observation can close the same surface
   // gate before a delayed library reply arrives.
   invalidate(error: RuntimeFailure): void {
@@ -63,13 +87,19 @@ export class LibraryObserver {
     ++this.readEpoch; this.dirty = false; this.cancelTimer?.();
     this.set({ status: 'unavailable', error });
   }
-  refresh(): Promise<void> {
+  refresh(force = true): Promise<void> {
     if (this.stopped) return Promise.resolve();
     this.expireBeforeUse();
-    if (this.reading !== null) { this.dirty = true; return this.reading; }
+    if (this.suspended) { this.needsRefresh = true; return Promise.resolve(); }
+    if (this.reading !== null) { if (force) this.dirty = true; return this.reading; }
+    this.needsRefresh = false; this.dirty = false;
+    this.activeReadEpoch = this.readEpoch;
     this.reading = this.read().finally(() => {
       this.reading = null;
-      if (this.dirty && !this.stopped) { this.dirty = false; void this.refresh(); }
+      if (this.dirty && !this.stopped) {
+        this.needsRefresh = true;
+        if (!this.suspended) void this.refresh(false);
+      }
     });
     return this.reading;
   }
@@ -80,7 +110,7 @@ export class LibraryObserver {
     if (!result.ok) {
       this.cancelTimer?.();
       this.set({ status: 'unavailable', error: result.error });
-      if (result.error.code === 'authorization-pending') {
+      if (!this.suspended && result.error.code === 'authorization-pending') {
         this.cancelTimer = this.scheduler.schedule(() => { void this.resume(); }, 2000);
       }
       return;
@@ -100,11 +130,20 @@ export class LibraryObserver {
     this.lastClockSeen = this.now();
     this.context = result.result;
     this.cancelTimer?.();
+    if (this.suspended && result.result.sync?.currentAttempt && isActiveAttempt(result.result.sync.currentAttempt.state)) {
+      this.needsRefresh = true;
+    }
     this.set({ status: 'ready', snapshot: result.result });
-    const attempt = result.result.sync?.currentAttempt;
+    this.arm();
+  }
+  private arm(): void {
+    this.cancelTimer?.(); this.cancelTimer = null;
+    if (this.stopped || this.suspended || this.state.status !== 'ready') return;
+    const snapshot = this.state.snapshot;
+    const attempt = snapshot.sync?.currentAttempt;
     const delays: number[] = [];
     if (attempt && isActiveAttempt(attempt.state)) delays.push(2000);
-    if (result.result.validUntil !== null) delays.push(Math.max(1, Date.parse(result.result.validUntil) - Date.parse(this.now())));
+    if (snapshot.validUntil !== null) delays.push(Math.max(1, Date.parse(snapshot.validUntil) - Date.parse(this.now())));
     if (delays.length) this.cancelTimer = this.scheduler.schedule(() => { void this.resume(); }, Math.min(2_147_483_647, ...delays));
   }
   dispose(): void {
