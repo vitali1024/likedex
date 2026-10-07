@@ -54,7 +54,8 @@ test('Options Connect uses native worker fetch with its required receiver', asyn
     await worker.evaluate(() => { (globalThis as unknown as { nativeFetchFailure: boolean }).nativeFetchFailure = false; });
     await page.getByRole('button', { name: 'Connect YouTube', exact: true }).click();
     await expect(page.locator('.header-account summary')).toHaveAccessibleDescription('Connected to YouTube. Read-only access.');
-    await expect(page.locator('.header-account summary').getByText('Read-only', { exact: true })).toBeVisible();
+    await expect(page.locator('.header-account summary')).toHaveAccessibleName(/^Connected as .+ — Read-only$/);
+    await expect(page.locator('.header-account .status-facts')).toContainText('AccessRead-only');
     const checks = await worker.evaluate(() => (globalThis as unknown as { nativeFetchChecks: unknown[] }).nativeFetchChecks);
     expect(checks.length).toBeGreaterThan(0);
     expect(checks.every((check) => JSON.stringify(check) === JSON.stringify({ correctUrl: true, bearerCorrect: true, method: 'GET', activeSignal: true }))).toBe(true);
@@ -106,7 +107,8 @@ test('separate validation package uses Options Connect, observes without writes,
     await options.getByRole('checkbox').check();
     await options.getByRole('button', { name: 'Connect YouTube', exact: true }).click();
     await expect(options.locator('.header-account summary')).toHaveAccessibleDescription('Connected to YouTube. Read-only access.');
-    await expect(options.locator('.header-account summary').getByText('Read-only', { exact: true })).toBeVisible();
+    await expect(options.locator('.header-account summary')).toHaveAccessibleName(/^Connected as .+ — Read-only$/);
+    await expect(options.locator('.header-account .status-facts')).toContainText('AccessRead-only');
     await options.getByRole('link', { name: 'open non-destructive provider observation' }).click();
     const page = options;
     await expect(page.getByRole('heading', { name: 'DEVELOPMENT / RELEASE VALIDATION ONLY' })).toBeVisible();

@@ -9,6 +9,7 @@ import { Icon } from './Icon';
 import { BrandMark } from './BrandMark';
 import { ConnectedAccount } from './ConnectedAccount';
 import { SyncStatus, syncStatusState } from './SyncStatus';
+import { HeaderStatusPlaceholder } from './StatusIcon';
 
 export { SyncStatus } from './SyncStatus';
 
@@ -83,6 +84,9 @@ export function OptionsApp({ client, surface = 'options' }: { client: RuntimeCli
   const coherent = identity?.status === 'authorized' && library.status === 'ready';
   const sync = library.status === 'ready' ? library.snapshot.sync : null;
   const state = syncStatusState(sync);
+  const connectionLabel = connecting ? 'Connecting…' : auth.status === 'loading' ? 'Checking connection…' : authValue?.status === 'validation-pending' ? 'Checking YouTube authorization…'
+    : mismatch ? 'Connection needs attention' : needsConnect || !agreed ? 'Not connected' : auth.status === 'unavailable' ? 'Connection unavailable' : 'Checking connection…';
+  const connectionTone = connecting ? 'active' : mismatch ? 'warning' : auth.status === 'unavailable' ? 'error' : needsConnect || !agreed ? 'disconnected' : 'active';
   const expandedSync = coherent && (state.active || state.partiallyUpdated || state.attempt?.error || (state.attempt && !state.sameSuccess));
   // A fresh document may receive companion replies in either order. Do not
   // expose ready rows/Sync until the existing identity/context gate also opens.
@@ -93,15 +97,15 @@ export function OptionsApp({ client, surface = 'options' }: { client: RuntimeCli
       <div className="header-status">
         <section className="header-account" aria-label="YouTube connection">
           {coherent ? <ConnectedAccount bootstrap={identity.bootstrap} />
-            : <span className="status-placeholder" role={auth.status === 'loading' || authValue?.status === 'validation-pending' ? 'status' : undefined}>
-              {auth.status === 'loading' ? 'Checking connection…' : authValue?.status === 'validation-pending' ? 'Checking YouTube authorization…'
-                : mismatch ? 'Connection needs attention' : needsConnect ? 'Not connected' : auth.status === 'unavailable' ? 'Connection unavailable' : 'Checking connection…'}</span>}
+            : <HeaderStatusPlaceholder kind="connection" label={connectionLabel} tone={connectionTone} />}
         </section>
-        {coherent ? <SyncStatus sync={sync} mode="header" /> : <span className="header-sync-placeholder status-placeholder" aria-hidden="true">Sync status pending</span>}
+        {coherent ? <SyncStatus sync={sync} mode="header" />
+          : <span className="header-sync-placeholder"><HeaderStatusPlaceholder kind="sync" label="Sync status pending" tone="idle" /></span>}
       </div>
       <div className="header-actions">
-        <button onClick={() => { void start(); }} disabled={!agreed || disconnected || !identity || mismatch || active || connecting || starting}>
-          <Icon name="sync" className={active || starting ? 'spinning' : ''} />{starting ? 'Requesting sync…' : active ? 'Sync in progress' : 'Sync'}</button>
+        <button aria-label={starting ? 'Requesting sync…' : active ? 'Sync in progress' : 'Sync'}
+          onClick={() => { void start(); }} disabled={!agreed || disconnected || !identity || mismatch || active || connecting || starting}>
+          <Icon name="sync" className={active || starting ? 'spinning' : ''} />Sync</button>
         <button className="icon-button" aria-label="Privacy & terms" title="Privacy & terms" onClick={() => privacyDialog.current?.showModal()}><Icon name="shield" /></button>
       </div></header>
     {(needsConnect || mismatch || auth.status === 'unavailable' || !agreed || connecting) && <section className="connection" aria-label="Connection guidance">

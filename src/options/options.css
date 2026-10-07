@@ -23,17 +23,16 @@ h3 { font-size: 16px; font-weight: 600; }
 .error { color: var(--danger); }
 .options-app { max-width: 1760px; height: 100dvh; min-height: 420px; margin: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
 .app-header,.brand,.header-actions { display: flex; align-items: center; gap: 10px; }
-.app-header { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 20px; align-items: center; border-bottom: 1px solid #ffffff0a; padding: 4px 4px 8px; min-height: 64px; flex: 0 0 auto; }
+.app-header { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 6px; align-items: center; border-bottom: 1px solid #ffffff0a; padding: 4px 4px 8px; min-height: 64px; flex: 0 0 auto; }
 .brand h1 { font-size: 23px; font-weight: 600; line-height: 1.1; letter-spacing: -.04em; }
 .brand p { font-size: 11px; color: var(--muted); margin-top: 3px; }
 .brand-mark { display: block; width: 36px; height: 36px; object-fit: contain; flex: 0 0 36px; }
-.header-actions > .icon-button { width: 40px; height: 40px; }
+.header-actions { gap: 4px; }
+.header-actions > button { min-height: 36px; height: 36px; padding: 8px; font-size: 12px; white-space: nowrap; }
+.header-actions > .icon-button { width: 36px; }
 .connection { flex: 0 0 auto; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(180deg,#09111cfa,#060b13fa); }
 .connection p + p { margin-top: 6px; }
-.account-primary { display: flex; align-items: start; gap: 8px; min-width: 0; }
 .status-icon { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; border: 1px solid var(--line); border-radius: 11px; background: #ffffff05; color: var(--muted); }
-.status-chip { display: inline-flex; align-items: center; gap: 5px; padding: 1px 7px; border: 1px solid #ffffff12; border-radius: 6px; font-size: 10px; color: #b4c8d6; background: #ffffff04; }
-.connection-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); flex: none; }
 .connection-disclosure > summary { min-height: 22px; padding: 0; border: 0; box-shadow: none; background: transparent; color: var(--muted); font-size: 11px; }
 .connection-disclosure { z-index: 6; justify-self: start; }
 .connection-disclosure .disclosure-content { left: 0; right: auto; }
@@ -282,7 +281,7 @@ dd { margin: 0; text-align: right; font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   .options-app { padding: 8px; min-height: 360px; gap: 8px; }
   .brand h1 { font-size: 20px; } .brand p { display: none; }
-  .header-actions { gap: 6px; } .header-actions > button { font-size: 12px; padding: 8px; }
+  .header-actions { gap: 4px; } .header-actions > button { font-size: 12px; padding: 8px; }
   .connection-disclosure .disclosure-content { position: fixed; top: 100px; left: 8px; right: 8px; width: auto; max-width: none; }
   .connected,.sync-status { padding: 10px; gap: 6px; }
   .sync-primary { flex-basis: 100%; }
@@ -321,42 +320,34 @@ dd { margin: 0; text-align: right; font-size: 13px; overflow-wrap: anywhere; }
   button:not(:disabled):active,.button:active { transform: none; }
 }
 
-.header-status { display: flex; justify-content: center; align-items: center; gap: 18px; min-width: 0; min-height: 36px; }
+.header-status { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 36px; }
 .header-account,.header-sync { min-width: 0; }
 .app-header .disclosure { margin: 0; align-self: auto; }
-.app-header .disclosure > summary { min-height: 36px; padding: 4px 6px; border: 0; border-radius: 8px; box-shadow: none; background: transparent; gap: 6px; justify-content: start; color: var(--ink); font-size: 12px; }
-.app-header .disclosure > summary:hover { background: #ffffff05; }
-.app-header .account-primary { display: flex; align-items: center; gap: 6px; }
-.account-name { font-size: 14px; line-height: 18px; font-weight: 600; max-width: 220px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.app-header .status-chip { border: 0; padding: 0; background: transparent; white-space: nowrap; }
-.header-sync-label { display: flex; align-items: center; flex-wrap: wrap; gap: 0 8px; min-width: 0; }
-.app-header .sync-heading { font-size: 13px; line-height: 18px; font-weight: 500; }
-.header-sync-label > .icon { width: 14px; height: 14px; flex-basis: 14px; color: #8bb69e; }
-.header-sync[data-tone='active'] .header-sync-label > .icon { color: var(--accent); }
-.header-sync[data-tone='warning'] .header-sync-label > .icon { color: #ffbd70; }
-.app-header .sync-updated { font-size: 11px; line-height: 16px; }
-.status-placeholder { display: flex; align-items: center; min-height: 36px; color: var(--muted); font-size: 11px; line-height: 18px; }
-.app-header .connection-disclosure .disclosure-content { left: 0; right: auto; }
+.status-glyph { position: relative; display: inline-flex; width: 20px; height: 20px; flex: 0 0 20px; align-items: center; justify-content: center; color: var(--muted); }
+.status-glyph[data-tone='success'],.status-glyph[data-tone='active'] { color: var(--accent); }
+.status-glyph[data-tone='warning'] { color: #ffbd70; }
+.status-glyph[data-tone='error'],.status-glyph[data-tone='disconnected'] { color: var(--danger); }
+.status-badge { position: absolute; right: -1px; bottom: -1px; display: grid; place-items: center; width: 10px; height: 10px; border: 1px solid var(--canvas); border-radius: 50%; background: var(--success); color: var(--canvas); }
+.status-badge[data-badge='dot'] { width: 6px; height: 6px; right: 0; bottom: 0; }
+.status-badge[data-badge='warning'] { background: #ffbd70; }
+.status-badge[data-badge='error'] { background: var(--danger); }
+.status-badge > .icon { width: 8px; height: 8px; flex-basis: 8px; stroke-width: 2.5; }
+.sync-details-summary { margin-top: 6px; }
+.app-header .connection-disclosure .disclosure-content { left: auto; right: 0; }
 .app-header .sync-disclosure .disclosure-content { left: auto; right: 0; }
-.compact-app .app-header { grid-template-columns: minmax(0,1fr) auto; gap: 4px 8px; padding: 4px 4px 6px; }
+.compact-app .app-header { padding: 4px 4px 6px; min-height: 54px; }
+.compact-app .brand { gap: 6px; min-width: 0; }
+.compact-app .brand-mark { width: 32px; height: 32px; flex-basis: 32px; }
 .compact-app .brand p { display: none; }
 .compact-app .brand h1 { font-size: 20px; }
-.compact-app .header-actions { grid-column: 2; grid-row: 1; }
-.compact-app .header-status { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: minmax(0,.44fr) minmax(0,.56fr); gap: 10px; justify-content: start; }
-.compact-app .header-status .disclosure > summary { padding: 0; display: grid; grid-template-columns: minmax(0,1fr) 16px; min-height: 36px; }
-.compact-app .account-primary { display: grid; grid-template-columns: 6px minmax(0,1fr); gap: 0 5px; }
-.compact-app .account-name { font-size: 12px; }
-.compact-app .account-primary .status-chip { grid-column: 2; line-height: 15px; }
-.compact-app .header-sync-label { display: grid; grid-template-columns: 14px minmax(0,1fr); gap: 0 4px; }
-.compact-app .header-sync-label .sync-updated { grid-column: 1 / -1; font-size: 10px; line-height: 15px; }
-.compact-app .header-sync-label .sync-heading { font-size: 12px; }
-@media (max-width: 1099px) {
-  .app-header .disclosure .disclosure-content { position: fixed; top: 112px; left: max(8px,calc(50vw - 220px)); right: auto; width: min(440px,calc(100vw - 16px)); max-width: none; max-height: calc(100dvh - 128px); }
-  .options-app:not(.compact-app) .app-header { grid-template-columns: minmax(0,1fr) auto; gap: 4px 8px; }
-  .options-app:not(.compact-app) .header-actions { grid-column: 2; grid-row: 1; }
-  .options-app:not(.compact-app) .header-status { grid-column: 1 / -1; grid-row: 2; justify-content: start; gap: 12px; }
+.app-header .compact-status-control > summary { width: 36px; height: 36px; min-height: 36px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(180deg,#0c1522f0,#070e18fa); box-shadow: inset 0 1px 0 #ffffff09,0 9px 20px #02081429; justify-content: center; }
+.app-header .compact-status-control > summary:hover { border-color: #ffffff26; background-color: #ffffff08; color: #fff; }
+.compact-app .app-header .disclosure .disclosure-content { position: fixed; top: 70px; left: max(8px,calc(50vw - 220px)); right: auto; width: min(440px,calc(100vw - 16px)); max-width: none; max-height: calc(100dvh - 86px); }
+@media (max-width: 380px) {
+  .app-header .brand h1 { font-size: 18px; }
 }
 @media (max-width: 600px) {
-  .app-header .disclosure .disclosure-content { position: fixed; top: 112px; left: 8px; right: 8px; width: auto; max-width: none; max-height: calc(100dvh - 128px); }
-  .options-app:not(.compact-app) .header-status { flex-wrap: wrap; }
+  .app-header .brand { gap: 6px; }
+  .app-header .brand-mark { width: 32px; height: 32px; flex-basis: 32px; }
+  .app-header .disclosure .disclosure-content { position: fixed; top: 84px; left: 8px; right: 8px; width: auto; max-width: none; max-height: calc(100dvh - 100px); }
 }

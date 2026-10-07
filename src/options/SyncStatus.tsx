@@ -1,10 +1,11 @@
-import { useId, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { SyncAttempt, SyncMetadata, LatestSuccessfulSync as SuccessfulSync } from '../domain/contracts';
 import { isActiveAttempt } from '../domain/contracts';
 import { ATTEMPT_LABELS, ERROR_MESSAGES, formatCount, formatDate } from './presentation';
 import { Disclosure } from './Disclosure';
 import { Icon } from './Icon';
 import { SyncProgress } from './SyncProgress';
+import { StatusIcon } from './StatusIcon';
 
 function Facts({ title, rows }: { title: string; rows: [string, ReactNode][] }) {
   return <section className="sync-detail-group"><h4>{title}</h4><dl className="status-facts">
@@ -63,23 +64,26 @@ export function syncStatusState(sync: SyncMetadata | null) {
     && (Boolean(success) || (attempt?.safeCommits ?? 0) > 0 || (sync.previousCompletedResult?.safeCommits ?? 0) > 0);
   const sameSuccess = success && (!attempt || (attempt.state === 'success' && attempt.attemptId === success.attemptId
     && attempt.ownerChannelId === success.ownerChannelId && attempt.dataGeneration === success.dataGeneration));
-  const tone = active ? 'active' : attempt && attempt.state !== 'success' ? 'warning' : success ? 'success' : 'idle';
+  const tone: 'active' | 'warning' | 'success' | 'idle' = active ? 'active' : attempt && attempt.state !== 'success' ? 'warning' : success ? 'success' : 'idle';
   return { attempt, success, active, healthyActive, partiallyUpdated, sameSuccess, tone };
 }
 
 export function SyncStatus({ sync, mode = 'expanded' }: { sync: SyncMetadata | null; mode?: 'header' | 'strip' | 'expanded' }) {
   const { attempt, success, active, healthyActive, partiallyUpdated, sameSuccess, tone } = syncStatusState(sync);
-  const phaseId = useId(), updatedId = useId();
-  const Phase = mode === 'header' ? 'span' : 'p';
-  const heading = <Phase className="sync-heading" id={phaseId} role={mode === 'strip' ? undefined : 'status'}>
-    {sameSuccess ? 'Sync complete' : attempt ? ATTEMPT_LABELS[attempt.state] : 'Never synced'}
-    {attempt?.retrying && ' · Retrying a temporary request'}</Phase>;
-  const details = <Disclosure className="sync-disclosure" ariaLabel="Sync details"
-    describedBy={mode === 'header' ? `${phaseId}${sameSuccess ? ` ${updatedId}` : ''}` : undefined} label={mode === 'header'
-    ? <span className="header-sync-label"><Icon name={active ? 'sync' : tone === 'success' ? 'check' : 'info'} className={active ? 'spinning' : ''} />
-      {heading}{sameSuccess && success && <span id={updatedId} className="sync-updated muted">Updated <DateValue value={success.completedAt} /></span>}</span>
-    : 'Sync details'}>
+  const header = mode === 'header';
+  const phaseLabel = `${sameSuccess ? 'Sync complete' : attempt ? ATTEMPT_LABELS[attempt.state] : 'Never synced'}${attempt?.retrying ? ' · Retrying a temporary request' : ''}`;
+  const updatedLabel = sameSuccess && success ? `Updated ${formatDate(success.completedAt)}` : '';
+  const glyph = <StatusIcon kind="sync" tone={attempt?.error ? 'error' : tone} spinning={active}
+    badge={active ? undefined : attempt?.error ? 'error' : sameSuccess ? 'check' : tone === 'warning' ? 'warning' : undefined} />;
+  const Phase = header ? 'span' : 'p';
+  const heading = <Phase className={header ? 'sync-heading sr-only' : 'sync-heading'} role={mode === 'strip' ? undefined : 'status'}>{phaseLabel}</Phase>;
+  const details = <Disclosure className={`sync-disclosure ${header ? 'compact-status-control' : ''}`} iconOnly={header}
+    title={header ? active ? 'Sync in progress' : phaseLabel : undefined}
+    ariaLabel={header ? `${active ? 'Sync in progress — ' : ''}${phaseLabel}${updatedLabel ? ` — ${updatedLabel}` : ''}` : 'Sync details'}
+    label={header ? <>{glyph}{heading}</> : 'Sync details'}>
       <h3>Synchronization details</h3>
+      {header && <><p className="sync-details-summary">{phaseLabel}</p>
+        {sameSuccess && success && <p className="muted">Updated <DateValue value={success.completedAt} /></p>}</>}
       <p className="muted sync-details-intro">Full scans run only when you choose Sync.</p>
       {attempt && <section className="sync-detail-event">
         {!sameSuccess && <h3>{active ? 'Current sync' : 'Current attempt'}</h3>}

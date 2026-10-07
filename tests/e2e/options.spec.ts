@@ -47,13 +47,68 @@ async function checkpoint(page: Page, values: Partial<SyncAttempt>) {
 }
 
 for (const surface of ['options', 'sidepanel']) {
+  test(`${surface}: icon controls retain keyboard details, real status visuals and the separate Sync action`, async () => {
+    const page = await open('library', true, surface);
+    await page.setViewportSize({ width: surface === 'sidepanel' ? 320 : 1440, height: 800 });
+    const account = page.locator('.header-account summary'), sync = page.locator('.header-sync summary');
+    await expect(account).toHaveAttribute('title', 'Connected');
+    await expect(sync).toHaveAttribute('title', 'Sync complete');
+    await page.locator('.brand').click(); await page.keyboard.press('Tab'); await expect(account).toBeFocused();
+    await expect(account).toHaveCSS('outline-style', 'solid');
+    await account.press('Space');
+    await expect(page.locator('.header-account .disclosure-content')).toBeVisible();
+    await expect(page.locator('.header-account .status-facts')).toContainText('My channel');
+    await expect(page.locator('.header-account .status-facts')).toContainText('Read-only');
+    await page.keyboard.press('Escape'); await expect(account).toBeFocused();
+    await page.keyboard.press('Tab'); await expect(sync).toBeFocused(); await sync.press('Enter');
+    await expect(page.locator('.header-sync .sync-details-summary')).toHaveText('Sync complete');
+    await expect(page.locator('.header-sync .disclosure-content')).toContainText('Updated');
+    await expect(page.locator('.header-sync .disclosure-content time')).not.toHaveCount(0);
+    await page.keyboard.press('Escape'); await expect(sync).toBeFocused();
+    await page.keyboard.press('Tab'); await expect(page.getByRole('button', { name: 'Sync', exact: true })).toBeFocused();
+    await page.getByRole('button', { name: 'Sync', exact: true }).click();
+    expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((call) => call === 'SYNC_START').length)).toBe(1);
+    await change(page, 'active');
+    await expect(sync).toHaveAccessibleName('Sync in progress — Scanning liked videos');
+    await expect(sync.locator('.status-glyph > .icon')).toHaveClass('icon spinning');
+    await expect(sync).toHaveCSS('animation-name', 'none');
+    await expect(sync.locator('.status-glyph')).toHaveCSS('animation-name', 'none');
+    await expect(sync.locator('[data-badge="check"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Sync in progress', exact: true })).toBeDisabled();
+    await expect(page.locator('main > .sync-status').getByRole('progressbar')).toBeVisible();
+    await page.screenshot({ path: resolve(`.output/status-header-canonical-${surface}-active.png`), animations: 'disabled' });
+    await checkpoint(page, { state: 'success', finishedAt: OBSERVED });
+    await expect(sync).toHaveAccessibleName(/Sync complete — Updated/);
+    await expect(sync.locator('[data-badge="check"]')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Sync', exact: true })).toBeEnabled();
+    await change(page, 'later-failure'); await expect(sync).toHaveAccessibleName('Sync failed');
+    await expect(sync.locator('[data-badge="error"]')).toHaveCount(1);
+    await change(page, 'mismatch'); await expect(account).toHaveAccessibleName('Connection needs attention');
+    await expect(account.locator('[data-badge="warning"]')).toHaveCount(1);
+    await change(page, 'disconnected'); await expect(account).toHaveAccessibleName('Not connected');
+    await expect(account.locator('.status-glyph')).toHaveAttribute('data-tone', 'disconnected');
+    await page.getByRole('button', { name: 'Connect YouTube', exact: true }).click();
+    await expect(account).toHaveAccessibleName('Connecting…');
+    await expect(account.locator('.status-glyph')).toHaveAttribute('data-tone', 'active');
+    await expect(account.locator('.status-glyph > .icon')).toHaveClass('icon spinning');
+    await page.clock.runFor(101);
+    await expect(account).toHaveAccessibleName('Connected as My channel — Read-only');
+    await expect(sync).toHaveAccessibleName('Never synced');
+    await expect(sync.locator('.status-glyph')).toHaveAttribute('data-tone', 'idle');
+    await expect(sync.locator('.status-badge')).toHaveCount(0);
+    await page.close();
+  });
+
+}
+
+for (const surface of ['options', 'sidepanel']) {
   test(`${surface}: D+.2 true document remount uses coherent header architecture from first paint`, async () => {
     const records = [];
     for (let cycle = 0; cycle < 5; cycle++) {
       const page = await open('bootstrap', true, surface);
       await page.setViewportSize({ width: surface === 'sidepanel' ? 360 : 1440, height: 800 });
       await expect(page.locator('.app-header')).toBeVisible();
-      await expect(page.getByText('Checking connection…', { exact: true })).toBeVisible();
+      await expect(page.locator('.header-account summary')).toHaveAccessibleName('Checking connection…');
       await expect(page.locator('.status-rail, .status-overview, main > .connection, main > .sync-status')).toHaveCount(0);
       const initial = (await page.locator('.app-header').boundingBox())!;
       await expect.poll(() => page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.pendingReads())).toBe(2);
@@ -66,7 +121,7 @@ for (const surface of ['options', 'sidepanel']) {
       }
       await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
       await expect(page.locator('.video-row')).toHaveCount(50);
-      await expect(page.locator('.account-name')).toHaveText('My channel');
+      await expect(page.locator('.header-account summary')).toHaveAccessibleName('Connected as My channel — Read-only');
       await expect(page.locator('.header-sync .sync-heading')).toHaveText('Sync complete');
       const ready = (await page.locator('.app-header').boundingBox())!;
       expect(Math.abs(ready.height - initial.height)).toBeLessThan(2);
@@ -80,10 +135,10 @@ for (const surface of ['options', 'sidepanel']) {
       records.push({ cycle, calls: observed.calls, headerHeight: ready.height, states: observed.states });
       await page.close(); // genuine document destruction, not hidden/visible reuse
     }
-    await writeFile(resolve(`.output/handoff-dplus2-bootstrap-${surface}.json`), JSON.stringify(records, null, 2));
+    await writeFile(resolve(`.output/status-header-canonical-bootstrap-${surface}.json`), JSON.stringify(records, null, 2));
   });
 
-  test(`${surface}: D+.2 integrated header geometry, semantic fields and stable disclosures`, async () => {
+  test(`${surface}: approved status header geometry, semantic fields and stable disclosures`, async () => {
     const page = await open('library', true, surface);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const header = page.locator('.app-header'), account = header.locator('.header-account'), status = header.locator('.header-sync');
@@ -93,25 +148,35 @@ for (const surface of ['options', 'sidepanel']) {
       await page.setViewportSize({ width: width!, height: height! });
       await expect(header).toHaveCount(1);
       await expect(page.locator('.status-rail, .status-overview, main > .connection, main > .sync-status')).toHaveCount(0);
-      await expect(account.locator('.account-name')).toHaveText('My channel');
-      await expect(account.locator('.status-chip')).toHaveText('Read-only');
-      await expect(account.locator('summary')).toHaveAccessibleName('Connection details for My channel');
+      await expect(account.locator('.account-name, .status-chip')).toHaveCount(0);
+      await expect(account.locator('summary')).toHaveAccessibleName('Connected as My channel — Read-only');
+      await expect(status.locator('summary')).toHaveAccessibleName(/Sync complete — Updated/);
+      await expect(header.locator('summary > .icon')).toHaveCount(0);
+      await expect(status.locator('summary time, summary .sync-updated')).toHaveCount(0);
+      const visible = await header.evaluate((node) => {
+        const clone = node.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll('.sr-only, .disclosure-content').forEach((child) => child.remove());
+        return clone.textContent;
+      });
+      expect(visible).not.toMatch(/My channel|Read-only|Sync complete|Updated/);
       await expect(account.locator('summary')).toHaveAccessibleDescription('Connected to YouTube. Read-only access.');
-      await expect(status.locator('summary')).toHaveAccessibleName('Sync details');
-      await expect(status.locator('summary')).toHaveAccessibleDescription(/Sync complete Updated/);
       await expect(status.locator('.sync-heading')).toHaveText('Sync complete');
-      await expect(status.locator('summary time')).toHaveCount(1);
+      await expect(account.locator('.status-glyph[data-kind="connection"] [data-badge="dot"]')).toHaveCount(1);
+      await expect(status.locator('.status-glyph[data-kind="sync"] [data-badge="check"]')).toHaveCount(1);
       await expect(header.locator('[role="status"]')).toHaveCount(1);
       expect(await header.evaluate((node) => (node as HTMLElement).innerText)).not.toMatch(/mirrored|owner-a|YouTube account/);
-      for (const selector of ['.account-primary', '.header-sync-label']) {
-        expect(await header.locator(selector).evaluate((node) => Array.from(node.childNodes).filter((child) => child.nodeType === Node.TEXT_NODE).map((child) => child.textContent).join('').trim())).toBe('');
-        expect(await header.locator(selector).evaluate((node) => [node, ...node.children].every((item) => ['::before', '::after'].every((pseudo) => ['none', 'normal'].includes(getComputedStyle(item, pseudo).content))))).toBe(true);
-      }
       const box = (await header.boundingBox())!, search = (await page.getByRole('searchbox').boundingBox())!;
       measurements.push({ width, height, headerTop: box.y, headerBottom: box.y + box.height, headerHeight: box.height,
         searchTop: search.y, firstResultTop: (await page.locator('.video-card').first().boundingBox())!.y });
-      if (surface === 'options' && width! >= 1100) { expect(box.height).toBeGreaterThanOrEqual(58); expect(box.height).toBeLessThanOrEqual(72); }
-      if (surface === 'sidepanel' && width! >= 360) expect(box.height).toBeLessThanOrEqual(96);
+      expect(box.height).toBe(surface === 'sidepanel' ? 54 : 64);
+      const controls = await Promise.all([account.locator('summary'), status.locator('summary'), header.getByRole('button', { name: 'Sync', exact: true }), header.getByRole('button', { name: 'Privacy & terms' })].map((control) => control.boundingBox()));
+      const brand = (await header.locator('.brand').boundingBox())!;
+      let right = brand.x + brand.width;
+      for (const control of controls) {
+        expect(control!.x).toBeGreaterThanOrEqual(right);
+        expect(control!.height).toBe(36); expect(control!.y).toBe(controls[0]!.y); right = control!.x + control!.width;
+      }
+      expect(right).toBeCloseTo(box.x + box.width - 4, 0);
       expect(search.y - box.y - box.height).toBeGreaterThanOrEqual(8); expect(search.y - box.y - box.height).toBeLessThanOrEqual(12);
       const actions = (await header.locator('.header-actions').boundingBox())!;
       for (const cluster of [account, status]) {
@@ -124,7 +189,13 @@ for (const surface of ['options', 'sidepanel']) {
         await trigger.focus(); await trigger.press('Enter');
         expect((await header.boundingBox())!.height).toBeCloseTo(box.height, 0);
         expect((await page.getByRole('searchbox').boundingBox())!.y).toBeCloseTo(search.y, 0);
-        const d = (await trigger.locator('..').locator('.disclosure-content').boundingBox())!;
+        const popup = trigger.locator('..').locator('.disclosure-content');
+        await expect.poll(() => popup.evaluate((node) => {
+          const rect = node.getBoundingClientRect(); return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight;
+        })).toBe(true);
+        const d = await popup.evaluate((node) => {
+          const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+        });
         expect(d.x).toBeGreaterThanOrEqual(0); expect(d.x + d.width).toBeLessThanOrEqual(width!);
         expect(d.y).toBeGreaterThanOrEqual(0); expect(d.y + d.height).toBeLessThanOrEqual(height!);
         await page.keyboard.press('Escape'); await expect(trigger).toBeFocused(); await page.clock.runFor(250);
@@ -134,16 +205,17 @@ for (const surface of ['options', 'sidepanel']) {
       await page.keyboard.press('Escape'); await page.clock.runFor(250);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await page.locator('.brand').click();
-      await page.screenshot({ path: resolve(`.output/handoff-dplus2-fixture-${surface}-${width}.png`), animations: 'disabled' });
+      await page.screenshot({ path: resolve(`.output/status-header-canonical-${surface}-${width}.png`), animations: 'disabled' });
+      await header.screenshot({ path: resolve(`.output/status-header-canonical-${surface}-${width}-header.png`), animations: 'disabled' });
     }
-    await writeFile(resolve(`.output/handoff-dplus2-measurements-${surface}.json`), JSON.stringify(measurements, null, 2));
+    await writeFile(resolve(`.output/status-header-canonical-measurements-${surface}.json`), JSON.stringify(measurements, null, 2));
     await change(page, 'active');
     await expect(page.locator('main > .sync-status').getByRole('progressbar')).toBeVisible();
     await expect(header.getByRole('status')).toContainText('Scanning liked videos');
     await change(page, 'later-failure');
     await expect(page.locator('main > .sync-status').getByRole('alert')).toBeVisible();
     await expect(page.locator('main > .sync-status .sync-prior')).toBeVisible();
-    await change(page, 'mismatch'); await expect(header.locator('.account-primary')).toHaveCount(0);
+    await change(page, 'mismatch'); await expect(header.locator('summary[aria-label^="Connected as"]')).toHaveCount(0);
     await expect(page.locator('.connection [role="alert"]')).toContainText('owner-a');
     await expect(page.locator('.connection [role="alert"]')).toContainText('owner-b');
     await expect(page.getByRole('button', { name: 'Sync', exact: true })).toBeDisabled();
@@ -155,7 +227,7 @@ for (const surface of ['options', 'sidepanel']) {
     await page.setViewportSize({ width: surface === 'options' ? 1440 : 360, height: 900 });
     await checkpoint(page, { state: 'success', finishedAt: OBSERVED, rawItems: 200, uniqueMembership: 195, estimatedTotal: 200 });
     const account = page.locator('.header-account'); const status = page.locator('.header-sync');
-    await expect(account.locator('.account-primary')).toContainText('My channel');
+    await expect(account.locator('summary')).toHaveAccessibleName('Connected as My channel — Read-only');
     await expect(account.locator('dd.channel-id')).toBeHidden();
     await page.screenshot({ path: resolve(`.output/handoff-dplus1-fixture-${surface}-rail.png`), animations: 'disabled' });
     await account.locator('summary').focus(); await page.keyboard.press('Enter');
@@ -269,18 +341,24 @@ for (const surface of ['options', 'sidepanel']) {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     for (const width of surface === 'options' ? [1440, 1200, 1024, 800] : [480, 360, 320]) {
       await page.setViewportSize({ width, height: 900 });
-      await expect(page.locator('.account-name')).toContainText('Very long channel');
+      await expect(page.locator('.header-account summary')).toHaveAccessibleName(/^Connected as Very long channel/);
       await expect(page.locator('.header-account summary')).toHaveAccessibleDescription('Connected to YouTube. Read-only access.');
       for (const selector of ['.connection-disclosure', '.sync-disclosure']) {
         await page.locator(`${selector} summary`).click();
-        const box = await page.locator(`${selector} .disclosure-content`).boundingBox();
+        // Wait for responsive layout to settle after each viewport change.
+        await expect.poll(() => page.locator(`${selector} .disclosure-content`).evaluate((node) => {
+          const rect = node.getBoundingClientRect(); return rect.left >= 0 && rect.right <= innerWidth;
+        })).toBe(true);
+        const box = await page.locator(`${selector} .disclosure-content`).evaluate((node) => {
+          const rect = node.getBoundingClientRect(); return { x: rect.x, width: rect.width };
+        });
         expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(width);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
         await page.keyboard.press('Escape'); await expect(page.locator(`${selector} summary`)).toBeFocused();
       }
     }
     await change(page, 'mismatch');
-    await expect(page.locator('.account-primary')).toHaveCount(0);
+    await expect(page.locator('summary[aria-label^="Connected as"]')).toHaveCount(0);
     await expect(page.locator('.connection')).toContainText('owner-a'); await expect(page.locator('.connection')).toContainText('owner-b');
     await expect(page.getByRole('button', { name: 'Sync', exact: true })).toBeDisabled();
     await page.close();
@@ -320,7 +398,7 @@ for (const surface of ['options', 'sidepanel']) {
     await expect(bar).toHaveCount(0);
     const primary = page.locator('.header-sync summary');
     await expect(primary).toContainText('Sync complete'); await expect(primary).not.toContainText('mirrored');
-    await expect(primary.locator('time')).toHaveCount(1); await expect(primary).toContainText('Updated');
+    await expect(primary.locator('time')).toHaveCount(0); await expect(primary).toHaveAccessibleName(/Sync complete — Updated/);
     await expect(primary).not.toContainText('pages accepted');
     await expect(status.getByText('Last successful sync:', { exact: false })).toHaveCount(0);
     await expect(page.locator('.video-row')).toHaveCount(50);
@@ -339,12 +417,13 @@ for (const surface of ['options', 'sidepanel']) {
     const bar = page.getByRole('progressbar');
     const status = page.locator('main > .sync-status');
     const account = page.getByRole('region', { name: 'YouTube connection' });
-    await expect(account.locator('.account-name')).toBeVisible();
+    await expect(account.locator('summary[aria-label^="Connected as"]')).toBeVisible();
     await expect(account.locator('summary')).toHaveAccessibleDescription('Connected to YouTube. Read-only access.');
-    await expect(account.getByText('Read-only', { exact: true }).first()).toBeVisible();
+    await expect(account.locator('summary')).toHaveAccessibleName('Connected as My channel — Read-only');
     await expect(account.getByText('owner-a', { exact: true })).not.toBeVisible();
     await account.locator('summary').focus(); await page.keyboard.press('Enter');
     await expect(account.getByText('owner-a', { exact: true })).toBeVisible();
+    await expect(account.getByText('Read-only', { exact: true }).first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.keyboard.press('Escape'); await expect(account.locator('summary')).toBeFocused();
     await checkpoint(page, { state: 'preparing', rawItems: 0, uniqueMembership: 0, estimatedTotal: null });
@@ -365,7 +444,8 @@ for (const surface of ['options', 'sidepanel']) {
     await expect(status.locator('.sync-prior')).toContainText('Last successful sync:');
     await expect(status.locator('.sync-prior')).toContainText('2 mirrored memberships');
     await expect(page.locator('.video-row')).toHaveCount(50);
-    await change(page, 'unknown-title'); await expect(account.getByText('YouTube channel', { exact: true }).first()).toBeVisible();
+    await change(page, 'unknown-title');
+    await expect(account.locator('summary')).toHaveAccessibleName('Connected as YouTube channel — Read-only');
     await change(page, 'mismatch');
     await expect(page.locator('.connection').getByText('Local library owner:', { exact: false })).toContainText('owner-a');
     await expect(page.locator('.connection').getByText('Connected channel:', { exact: false })).toContainText('owner-b');
@@ -682,7 +762,7 @@ test('first run requires privacy agreement and explicit Connect; pending, denial
   await expect(page.getByText('Read-only permission was denied or cancelled.', { exact: false })).toBeVisible();
   await change(page, 'disconnected');
   await page.getByRole('button', { name: 'Connect YouTube', exact: true }).click();
-  await expect(page.locator('.account-name')).toBeVisible();
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   await expect(page.getByText('Connected, never synced.', { exact: false })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((c) => c === 'AUTH_CONNECT').length)).toBe(2);
   expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls)).not.toContain('SYNC_START');
@@ -742,7 +822,7 @@ test('keyboard shortcut, narrow focused detail/Back, page context and no horizon
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1200, height: 800 });
   await expect(page.locator('.video-row')).toHaveCount(50);
-  await expect(page.locator('.account-name')).toBeVisible();
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   const idleReads = await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((c) => c === 'LIBRARY_SNAPSHOT_GET').length);
   await page.clock.fastForward(6000);
   expect(await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls.filter((c) => c === 'LIBRARY_SNAPSHOT_GET').length)).toBe(idleReads);
@@ -910,7 +990,7 @@ test('3547-record library stays page bounded and local while selection and filte
 test('consecutive page revision bursts keep identity, progress and local browsing usable in flight', async () => {
   const page = await open('active');
   await expect(page.locator('.video-row')).toHaveCount(50);
-  await expect(page.locator('.account-name')).toBeVisible();
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sync in progress', exact: true })).toBeDisabled();
   await page.evaluate(() => {
     const violations: string[] = [];
@@ -918,8 +998,8 @@ test('consecutive page revision bursts keep identity, progress and local browsin
     new MutationObserver(() => {
       if (!document.querySelector('.video-row')) violations.push('rows disappeared');
       if (document.querySelector<HTMLInputElement>('[aria-label="Search library"]')?.disabled) violations.push('search disabled');
-      if (!document.querySelector('.account-name')) violations.push('identity disappeared');
-      if (!document.querySelector('.header-actions button')?.textContent?.includes('Sync in progress')) violations.push('sync became idle');
+      if (!document.querySelector('summary[aria-label^="Connected as"]')) violations.push('identity disappeared');
+      if (document.querySelector('.header-actions button')?.getAttribute('aria-label') !== 'Sync in progress') violations.push('sync became idle');
       if (document.querySelector('.loading-state, .empty.error')) violations.push('library loading/error');
     }).observe(document.querySelector('main')!, { subtree: true, childList: true, attributes: true, characterData: true });
   });
@@ -940,7 +1020,7 @@ test('consecutive page revision bursts keep identity, progress and local browsin
       await expect(page.locator('.filter-trigger')).toBeEnabled();
       await expect(page.getByLabel('Duration', { exact: true })).toBeEnabled();
       await expect(page.getByLabel('Sort', { exact: true })).toBeEnabled();
-      await expect(page.locator('.account-name')).toBeVisible();
+      await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Sync in progress', exact: true })).toBeDisabled();
       // Search is actually used while both authoritative reads are held.
       await page.getByLabel('Search library').fill('video 004'); await expect(page.locator('.video-row')).toHaveCount(1);
@@ -960,7 +1040,7 @@ test('consecutive page revision bursts keep identity, progress and local browsin
 for (const boundary of ['generation', 'epoch'] as const) {
   test(`${boundary} revision immediately clears library and auth identity while refresh is held`, async () => {
     const page = await open('active');
-    await expect(page.locator('.account-name')).toBeVisible();
+    await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
     await page.getByText('Filter library', { exact: true }).click();
     await page.getByRole('checkbox', { name: 'Travel', exact: true }).check();
     await page.evaluate((boundary) => {
@@ -968,7 +1048,7 @@ for (const boundary of ['generation', 'epoch'] as const) {
       h.holdReads(); h.invalidate(boundary);
     }, boundary);
     await expect(page.locator('.video-row')).toHaveCount(0);
-    await expect(page.locator('.account-name')).toHaveCount(0);
+    await expect(page.locator('summary[aria-label^="Connected as"]')).toHaveCount(0);
     await expect(page.getByLabel('Search library')).toBeDisabled();
     await expect(page.locator('.filter-panel')).toHaveCount(0); await expect(page.locator('.active-filters')).toHaveCount(0);
     await expect(page.locator('.filter-trigger')).toBeDisabled();
@@ -981,7 +1061,7 @@ for (const boundary of ['generation', 'epoch'] as const) {
 
 test('hidden active surface retains eligible rows, pauses polling and catches up once on visibility plus focus', async () => {
   const page = await open('active');
-  await expect(page.locator('.account-name')).toBeVisible();
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   const before = await requestCounts(page);
   await page.evaluate(() => {
     const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
@@ -995,11 +1075,11 @@ test('hidden active surface retains eligible rows, pauses polling and catches up
   await setVisibility(page, 'visible');
   expect(await requestCounts(page)).toEqual({ snapshot: before.snapshot + 1, auth: before.auth + 1 });
   await expect(page.locator('.video-row')).toHaveCount(50);
-  await expect(page.locator('.account-name')).toBeVisible();
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
   await expect(page.locator('main > .sync-status')).toContainText('150 memberships scanned');
   await expect(page.locator('.video-row')).toHaveCount(50);
-  await expect(page.locator('.account-name')).toBeVisible();
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   expect(await requestCounts(page)).toEqual({ snapshot: before.snapshot + 1, auth: before.auth + 1 });
   await page.clock.fastForward(2000);
   expect(await requestCounts(page)).toEqual({ snapshot: before.snapshot + 2, auth: before.auth + 1 });
@@ -1027,7 +1107,7 @@ async function observeLifecycle(page: Page) {
     new MutationObserver(() => {
       if (!document.querySelector('.video-row')) violations.push('rows disappeared');
       if (document.querySelector<HTMLInputElement>('[aria-label="Search library"]')?.disabled) violations.push('search disabled');
-      if (!document.querySelector('.account-name')) violations.push('identity disappeared');
+      if (!document.querySelector('summary[aria-label^="Connected as"]')) violations.push('identity disappeared');
       if (document.querySelector('.loading-state')) violations.push('skeleton appeared');
       if (/Loading (local snapshot|sync status|connection status)|Checking YouTube authorization/.test(document.querySelector('main')!.textContent!)) violations.push('loading/checking appeared');
       if (document.querySelector('.empty.error')) violations.push('unavailable/error');
@@ -1042,7 +1122,7 @@ for (const surface of ['options', 'sidepanel']) {
   test(`${surface}: five eligible hide/show cycles retain rows, account, Sync and browsing state with zero reads`, async () => {
     const page = await open('library', true, surface);
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(page.locator('.account-name')).toBeVisible();
+    await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
     await change(page, 'library', 160);
     await expect(page.locator('.results-heading')).toContainText('160 results');
     await page.getByLabel('Search library').fill('video');
@@ -1082,7 +1162,7 @@ for (const surface of ['options', 'sidepanel']) {
   });
   test(`${surface}: hidden active Sync with no revision uses one snapshot catch-up and zero auth reads`, async () => {
     const page = await open('active', true, surface);
-    await expect(page.locator('.account-name')).toBeVisible();
+    await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
     const before = await requestCounts(page); await observeLifecycle(page);
     await setVisibility(page, 'hidden'); await page.clock.fastForward(10_000);
     expect(await requestCounts(page)).toEqual(before);
@@ -1097,7 +1177,7 @@ for (const surface of ['options', 'sidepanel']) {
   });
   test(`${surface}: hidden expiry removes all row/link actions before visible reuse`, async () => {
     const page = await open('library', true, surface);
-    await expect(page.locator('.account-name')).toBeVisible();
+    await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
     await page.locator('.video-row').first().click();
     await setVisibility(page, 'hidden');
     await page.clock.setSystemTime(new Date('2026-10-16T00:00:00.000Z'));
@@ -1106,7 +1186,7 @@ for (const surface of ['options', 'sidepanel']) {
     await expect(page.locator('.video-row')).toHaveCount(0);
     await expect(page.locator('a[href*="youtube.com/watch"]')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Copy link/ })).toHaveCount(0);
-    await expect(page.locator('.account-name')).toHaveCount(0);
+    await expect(page.locator('summary[aria-label^="Connected as"]')).toHaveCount(0);
     await expect(page.getByLabel('Search library')).toBeDisabled();
     await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
     await expect(page.locator('.video-row')).toHaveCount(0); await page.close();
@@ -1114,17 +1194,17 @@ for (const surface of ['options', 'sidepanel']) {
   for (const boundary of ['generation', 'epoch'] as const) {
     test(`${surface}: hidden ${boundary} invalidation never revives old rows or identity`, async () => {
       const page = await open('library', true, surface);
-      await expect(page.locator('.account-name')).toBeVisible();
+      await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
       await setVisibility(page, 'hidden');
       await page.evaluate((boundary) => {
         const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
         h.holdReads(); h.invalidate(boundary);
       }, boundary);
       await expect(page.locator('.video-row')).toHaveCount(0);
-      await expect(page.locator('.account-name')).toHaveCount(0);
+      await expect(page.locator('summary[aria-label^="Connected as"]')).toHaveCount(0);
       await setVisibility(page, 'visible');
       await expect(page.locator('.video-row')).toHaveCount(0);
-      await expect(page.locator('.account-name')).toHaveCount(0);
+      await expect(page.locator('summary[aria-label^="Connected as"]')).toHaveCount(0);
       await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
       await expect(page.getByText('Connected, never synced.', { exact: false })).toBeVisible();
       await expect(page.locator('.video-row')).toHaveCount(0); await page.close();
@@ -1134,8 +1214,8 @@ for (const surface of ['options', 'sidepanel']) {
 
 test('Full Library and companion surface retain independent views across browser foreground changes', async () => {
   const full = await open(); const panel = await open('library', true, 'sidepanel');
-  await expect(full.locator('.account-name')).toBeVisible();
-  await expect(panel.locator('.account-name')).toBeVisible();
+  await expect(full.locator('summary[aria-label^="Connected as"]')).toBeVisible();
+  await expect(panel.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   await observeLifecycle(full); await observeLifecycle(panel);
   const other = await context.newPage(); await other.goto('about:blank');
   const before = await requestCounts(full), panelBefore = await requestCounts(panel);
@@ -1158,14 +1238,14 @@ test('Full Library and companion surface retain independent views across browser
 
 test('explicit refresh auth fences a cached library on a dropped context broadcast and late library response', async () => {
   const page = await open();
-  await expect(page.locator('.account-name')).toBeVisible();
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   await page.evaluate(() => {
     const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
     h.holdReads(['LIBRARY_SNAPSHOT_GET']); h.invalidate('generation', false);
   });
   await page.getByRole('button', { name: 'Sync', exact: true }).click();
   await expect(page.locator('.video-row')).toHaveCount(0);
-  await expect(page.locator('.account-name')).toHaveCount(0);
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toHaveCount(0);
   await page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.releaseReads());
   await expect(page.getByText('Connected, never synced.', { exact: false })).toBeVisible();
   await expect(page.locator('.video-row')).toHaveCount(0);
@@ -1174,14 +1254,14 @@ test('explicit refresh auth fences a cached library on a dropped context broadca
 
 test('same-context passive auth pending retains eligible identity, but an actual auth failure fences a delayed library reply', async () => {
   const page = await open('active');
-  await expect(page.locator('.account-name')).toBeVisible();
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   await page.evaluate(() => {
     const h = (window as unknown as { optionsTest: OptionsTestControl }).optionsTest;
     h.holdReads(['LIBRARY_SNAPSHOT_GET']); h.change('auth-pending');
   });
   await expect.poll(() => page.evaluate(() => (window as unknown as { optionsTest: OptionsTestControl }).optionsTest.pendingReads())).toBe(1);
   await expect(page.locator('.video-row')).toHaveCount(50);
-  await expect(page.locator('.account-name')).toBeVisible();
+  await expect(page.locator('summary[aria-label^="Connected as"]')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sync in progress', exact: true })).toBeDisabled();
   await change(page, 'auth-error');
   await expect(page.getByRole('heading', { name: 'Connection status unavailable' })).toBeVisible();

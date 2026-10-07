@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { LibraryBrowser, VideoDetail } from '@/src/options/LibraryBrowser';
 import { PrivacyNotice, SyncStatus } from '@/src/options/OptionsApp';
-import { ATTEMPT_LABELS, failureMessage } from '@/src/options/presentation';
+import { ATTEMPT_LABELS, failureMessage, formatDate } from '@/src/options/presentation';
 import { ConnectedAccount } from '@/src/options/ConnectedAccount';
 import { SyncProgress } from '@/src/options/SyncProgress';
 import { ChannelMultiSelect, channelOptions, channelSelectionLabel } from '@/src/options/ChannelMultiSelect';
@@ -179,7 +179,7 @@ describe('Handoff B status hierarchy and connected account', () => {
     const html = renderToStaticMarkup(<ConnectedAccount bootstrap={{ channelId: 'owner-a', channelTitle, likesPlaylistId: 'likes-owner-a' }} />);
     const primary = html.split('</summary>')[0]!;
     expect(primary).toContain(channelTitle?.trim() || 'YouTube channel'); expect(primary).toContain('Read-only'); expect(primary).toContain('Connected');
-    expect(primary).not.toContain('owner-a'); expect(html).toContain('Connection details');
+    expect(primary).not.toContain('owner-a'); expect(html).toContain('Connection information');
     expect(html).toContain('<dt>Channel ID</dt><dd class="channel-id">owner-a</dd>'); expect(html).not.toContain('<details open');
   });
 });
@@ -258,9 +258,9 @@ describe('Handoff D+.1 quiet status fields', () => {
   it('removes the account eyebrow and bordered Connected chip while retaining explicit trust text', () => {
     const html = renderToStaticMarkup(<ConnectedAccount bootstrap={{ channelId: 'owner-a', channelTitle: 'My channel', likesPlaylistId: 'likes-owner-a' }} />);
     const primary = html.split('</summary>')[0]!;
-    expect(primary).toContain('<span class="account-name">My channel</span>');
-    expect(primary).toContain('aria-label="Connection details for My channel"'); expect(primary).toContain('Connected to YouTube. Read-only access.');
-    expect(primary).toContain('<span class="status-chip">Read-only</span>');
+    expect(primary).not.toContain('account-name');
+    expect(primary).toContain('aria-label="Connected as My channel — Read-only"'); expect(primary).toContain('Connected to YouTube. Read-only access.');
+    expect(primary).not.toContain('status-chip');
     expect(primary).not.toContain('YouTube account'); expect(primary).not.toContain('connected-chip');
     expect(primary).not.toMatch(/[·|]/); expect(primary).not.toContain('role="status"');
   });
@@ -270,8 +270,8 @@ describe('Handoff D+.2 header status disclosures', () => {
   it('omits mirror diagnostics from the closed header while retaining structured exact counts', () => {
     const html = renderToStaticMarkup(<SyncStatus sync={optionsSnapshot().sync} mode="header" />);
     const trigger = html.split('</summary>')[0]!;
-    expect(trigger).toContain('aria-label="Sync details"'); expect(trigger).toContain('Sync complete');
-    expect(trigger).toContain('class="sync-updated muted">Updated <time');
+    expect(trigger).toContain('aria-label="Sync complete — Updated'); expect(trigger).toContain('Sync complete');
+    expect(trigger).not.toContain('<time'); expect(html).toContain('Updated <time');
     expect(trigger).not.toContain('mirrored'); expect(trigger).not.toContain('sync-metric'); expect(trigger).not.toMatch(/[·|]/);
     expect(html).toContain('<dt>Mirrored videos</dt><dd>2</dd>');
     expect(html).toContain('<dt>Available videos</dt><dd>1</dd>');
@@ -290,5 +290,55 @@ describe('Handoff D+.2 header status disclosures', () => {
     const html = renderToStaticMarkup(<SyncStatus sync={null} mode="header" />);
     expect(html).toContain('Never synced'); expect(html).toContain('No successful sync recorded.');
     expect(html).not.toContain('<time'); expect(html).not.toContain('Mirrored videos');
+  });
+});
+
+describe('Canonical compact status controls on both surfaces', () => {
+  const bootstrap = { channelId: 'owner-a', channelTitle: 'My channel', likesPlaylistId: 'likes-owner-a' };
+  it('keeps account identity/access in shared details and the accessible name, outside the compact visible label', () => {
+    const html = renderToStaticMarkup(<ConnectedAccount bootstrap={bootstrap} />);
+    const trigger = html.split('</summary>')[0]!;
+    expect(trigger).toContain('aria-label="Connected as My channel — Read-only"');
+    expect(trigger).toContain('title="Connected"'); expect(trigger).toContain('data-kind="connection"');
+    expect(trigger).toContain('data-badge="dot"'); expect(trigger).not.toContain('account-name');
+    expect(trigger).not.toContain('status-chip'); expect(trigger).not.toContain('m6 9 6 6 6-6');
+    expect(html).toContain('<dt>Connected channel</dt><dd>My channel</dd>');
+    expect(html).toContain('<dt>Access</dt><dd>Read-only</dd>');
+  });
+  it('uses compact connection and completed-sync glyphs without an alternate desktop prose branch', () => {
+    const account = renderToStaticMarkup(<ConnectedAccount bootstrap={bootstrap} />);
+    const sync = renderToStaticMarkup(<SyncStatus sync={optionsSnapshot().sync} mode="header" />);
+    expect(account).not.toContain('account-name'); expect(account).toContain('data-kind="connection"');
+    expect(account).not.toContain('connection-dot'); expect(sync).toContain('data-kind="sync"');
+    expect(sync).toContain('data-badge="check"'); expect(sync.split('</summary>')[0]).not.toContain('<time'); expect(sync).toContain('Updated <time');
+  });
+  it('names completed sync with actual freshness and keeps verbose freshness in shared details', () => {
+    const html = renderToStaticMarkup(<SyncStatus sync={optionsSnapshot().sync} mode="header" />);
+    const trigger = html.split('</summary>')[0]!;
+    expect(trigger).toContain(`aria-label="Sync complete — Updated ${formatDate(OBSERVED)}"`);
+    expect(trigger).toContain('data-badge="check"'); expect(trigger).toContain('sync-heading sr-only');
+    expect(trigger).not.toContain('<time'); expect(trigger).not.toContain('sync-updated');
+    expect(html).toContain('Updated <time'); expect(html).toContain('<dt>Mirrored videos</dt><dd>2</dd>');
+    expect(html.match(/role="status"/g)).toHaveLength(1);
+  });
+  it('announces the real active phase, spins only the glyph, and keeps the success badge absent', () => {
+    const html = renderToStaticMarkup(<SyncStatus sync={{ ...optionsSnapshot().sync!, currentAttempt: attempt({ attemptId: NEXT_ATTEMPT_ID }) }} mode="header" />);
+    const trigger = html.split('</summary>')[0]!;
+    expect(trigger).toContain('aria-label="Sync in progress — Scanning liked videos"');
+    expect(trigger).toContain('class="icon spinning"'); expect(trigger).not.toContain('data-badge="check"');
+    expect(trigger).not.toContain('Updated'); expect(html).toContain('Previous successful snapshot');
+  });
+  it('represents a failed later attempt without disguising previous success as current completion', () => {
+    const html = renderToStaticMarkup(<SyncStatus sync={{ ...optionsSnapshot().sync!, currentAttempt: attempt({ attemptId: NEXT_ATTEMPT_ID,
+      state: 'failure', finishedAt: OBSERVED, error: { category: 'network', messageKey: 'network-failed', phase: 'scanning' } }) }} mode="header" />);
+    const trigger = html.split('</summary>')[0]!;
+    expect(trigger).toContain('aria-label="Sync failed"'); expect(trigger).toContain('data-badge="error"');
+    expect(trigger).not.toContain('data-badge="check"'); expect(trigger).not.toContain('spinning');
+    expect(html).toContain('Last successful snapshot');
+  });
+  it('keeps never-synced status muted without invented completion or freshness', () => {
+    const html = renderToStaticMarkup(<SyncStatus sync={null} mode="header" />);
+    expect(html).toContain('aria-label="Never synced"'); expect(html).toContain('data-tone="idle"');
+    expect(html).not.toContain('data-badge'); expect(html).not.toContain('<time');
   });
 });

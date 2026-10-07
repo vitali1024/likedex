@@ -2,7 +2,15 @@
 
 ## Current presentation, amended 2026-10-07
 
-### Handoff D+.2 header/bootstrap contract, 2026-10-07
+### Canonical compact status controls on both surfaces, 2026-10-07
+
+Both Full Library / Options and Side Panel use the same compact icon-only status controls. One header row reads brand, Connection status, Sync status, explicit Sync action and existing Privacy shield. Full Library balances its brand at left and four-control cluster at right; no old central verbose block or second status row remains. Controls use the existing 36px rounded-square button family, 16px vectors and tiny lower-right badges. Account name, Read-only, phase, timestamp and status chevrons are details-only rather than permanently visible. Actual account/access and phase/freshness remain in accessible names, shared structured disclosures and native title tooltips. Keyboard activation, focus, Escape and outside dismissal remain.
+
+ConnectedAccount has one icon-only trigger. SyncStatus's header mode has one icon-only trigger; expanded/strip progress and recovery still share the existing derivation/details. The compact presentation props, verbose header branches, unused freshness description IDs and obsolete descriptive/wrapping CSS are removed. OptionsApp retains surface context only for actual surface layout/browsing necessities. Full Library targets a 64px single-row header; Side Panel remains 54px. Existing wide search/content geometry is preserved; eliminating the old medium status row recovers its height without changing toolbar/list/detail structure. Disclosures stay bounded and do not resize header/library.
+
+StatusIcon and local Icon paths are reused unchanged: link/unplug/loader/sync/check/warning/close. Cyan, success/warning/error badges, glyph-only spinning and reduced motion preserve existing state mappings; unknown/never-synced stays muted. Bootstrap placeholders use the same two controls, without fabricated identity or completion. Only the actual phase is live, visually hidden in both headers; freshness is read on demand. Auth, sync, storage, retention, worker lifecycle, query/filter/Reset/rows/navigation and Privacy behavior are unchanged. See [current evidence and unpassed native smoke](status-header-redesign.md); the initial surface-specific approval and its verification remain explicitly historical there.
+
+### Historical Handoff D+.2 header/bootstrap contract, 2026-10-07 (presentation superseded; runtime retained)
 
 Normal global Account/Sync state lives inside the application header on both surfaces. No standalone normal status-overview/rail/card sits between header and library. Wide Full Library uses brand, compact status clusters and separate Sync/Privacy actions in that DOM order, targeting 58–68px header height (72px tolerance). Medium widths may wrap into an internal second row. Semantic compact-app/surface=sidepanel always selects two internal header rows, including during Chrome viewport animation; normal 360/480px header targets at most 96px. Search follows with the existing compact gap.
 
