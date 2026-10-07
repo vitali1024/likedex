@@ -18,6 +18,15 @@ export function optionsSnapshot(count = 62): RuntimeResult<'LIBRARY_SNAPSHOT_GET
     owner: owner(), videos: optionsVideos(count), sync: { currentAttempt: null, previousCompletedResult: null,
       latestSuccessfulSync: success(), lastMirrorChangeRevision: 1, lastFinalizedMirrorRevision: 1 } };
 }
+// Exceptional labels and a scrollable option list, isolated from production.
+export function channelPickerVideos() {
+  return optionsVideos(100).map((entry, index) => {
+    const channelTitle = index < 2 ? 'Same name' : index < 4 ? null : index === 4 ? '<script> & "Channel"'
+      : index === 5 ? `Very long channel ${'name '.repeat(35)}` : `Channel ${String(index).padStart(3, '0')}`;
+    return { ...entry, channelId: `UC-${String(index).padStart(3, '0')}-same-suffix`, channelTitle,
+      metadataFreshness: { ...entry.metadataFreshness, channelTitle: channelTitle === null ? null : freshness() } };
+  });
+}
 export function optionsAuth(): RuntimeResult<'AUTH_STATUS_GET'> {
   return { status: 'authorized', bootstrap: { channelId: 'owner-a', channelTitle: 'My channel', likesPlaylistId: 'likes-owner-a' },
     ownerComparison: 'SAME_REMOTE_OWNER', control: { revision: 1, dataGeneration: 0, authEpoch: 0, connectionGate: 'connected',

@@ -5,6 +5,9 @@ import { PrivacyNotice, SyncStatus } from '@/src/options/OptionsApp';
 import { ATTEMPT_LABELS, failureMessage } from '@/src/options/presentation';
 import { ConnectedAccount } from '@/src/options/ConnectedAccount';
 import { SyncProgress } from '@/src/options/SyncProgress';
+import { ChannelMultiSelect, channelOptions, channelSelectionLabel } from '@/src/options/ChannelMultiSelect';
+import { SingleSelect } from '@/src/options/SingleSelect';
+import { copyPanelFilters, initialPanelFilters, panelFilterGroups, validPanelDates } from '@/src/options/FilterPanel';
 import { failure } from '@/src/runtime/contracts';
 import { optionsSnapshot, optionsVideos } from '../fixtures/options';
 import { attempt, NEXT_ATTEMPT_ID, OBSERVED, success } from '../fixtures/storage';
@@ -41,6 +44,65 @@ describe('Options presentation (AC-OPTIONS-001, AC-SYNC-005/007/011/013)', () =>
   it('shows a closed-gate rejection without inventing activity', () => {
     expect(failureMessage(failure('provider-validation-required'))).toContain('No sync was started');
   });
+});
+
+describe('Handoff C.1 themed selects, direct channels and drafts', () => {
+  const choices = channelOptions([['a', 'Travel'], ['b', 'Music']]);
+  it.each(['Duration', 'Sort', 'Date basis'])('renders %s as one named themed trigger with one chevron', (label) => {
+    const html = renderToStaticMarkup(<SingleSelect label={label} value="a" options={[{ value: 'a', label: 'Choice' }]}
+      open={false} onOpenChange={() => {}} onChange={() => {}} />);
+    expect(html).toContain(`aria-label="${label}"`); expect(html).not.toContain('<select');
+    expect(html.match(/<svg/g)).toHaveLength(1); expect(html).toContain('control-chevron');
+    expect(html).toContain('aria-hidden="true"'); expect(html).toContain('aria-haspopup="listbox"');
+  });
+  it('preserves stable-ID ordering and hides ordinary IDs', () => {
+    expect(choices).toEqual([{ id: 'a', title: 'Travel', disambiguator: null }, { id: 'b', title: 'Music', disambiguator: null }]);
+  });
+  it('disambiguates duplicate normalized names with full exact IDs', () => {
+    expect(channelOptions([['UC-a-same-suffix', 'Music'], ['UC-b-same-suffix', 'ＭＵＳＩＣ']]).map((option) => option.disambiguator))
+      .toEqual(['UC-a-same-suffix', 'UC-b-same-suffix']);
+  });
+  it('uses truthful missing-name fallback, disambiguating only collisions', () => {
+    expect(channelOptions([['a', '']])[0]).toEqual({ id: 'a', title: 'Channel name unknown', disambiguator: null });
+    expect(channelOptions([['a', ''], ['b', '   ']]).map((option) => option.disambiguator)).toEqual(['a', 'b']);
+  });
+  it.each([[[], 'All channels'], [['a'], '1 selected'], [['a', 'b'], '2 selected'], [['missing'], '1 selected']] as const)(
+    'summarizes selected IDs %j as %s', (selected, label) => { expect(channelSelectionLabel(selected)).toBe(label); });
+  it('renders direct named search/checkboxes with no nested trigger or contradictory roles', () => {
+    const html = renderToStaticMarkup(<ChannelMultiSelect options={choices} selected={[]} onChange={() => {}} />);
+    expect(html).toContain('All channels'); expect(html).toContain('Search channels'); expect(html.match(/type="checkbox"/g)).toHaveLength(2);
+    expect(html).not.toContain('aria-expanded'); expect(html).not.toContain('role="combobox"'); expect(html).not.toContain('role="listbox"');
+  });
+  it('renders only disabled empty controls without an eligible snapshot or provider labels', () => {
+    const html = renderToStaticMarkup(<LibraryBrowser observation={{ status: 'loading' }} />);
+    expect(html).toContain('disabled=""'); expect(html).not.toContain('channel-section'); expect(html).not.toContain('Travel');
+    expect(html).not.toContain('Music'); expect(html).not.toContain('multiple=');
+  });
+  it('restores Reset view and retains no permanent helper prose/native selects', () => {
+    const html = renderToStaticMarkup(<LibraryBrowser observation={{ status: 'ready', snapshot: optionsSnapshot() }} />);
+    expect(html.match(/class="single-select"/g)).toHaveLength(2);
+    expect(html).toContain('Reset view'); expect(html).toContain('Reset search, filters, sort and current view'); expect(html).not.toContain('Choose one or more');
+    expect(html).not.toContain('Dates include both'); expect(html).not.toContain('multiple=');
+  });
+  it('exposes a single selected marker/semantic state and active current choice in the listbox', () => {
+    const html = renderToStaticMarkup(<SingleSelect label="Sort" value="b" options={[{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]}
+      open onOpenChange={() => {}} onChange={() => {}} />);
+    expect(html).toContain('role="listbox"'); expect(html.match(/role="option"/g)).toHaveLength(2);
+    expect(html.match(/aria-selected="true"/g)).toHaveLength(1); expect(html).toContain('data-active="true" data-value="b"');
+    expect(html).toContain('aria-activedescendant='); expect(html).toContain('popover="manual"');
+  });
+  it('copies only panel-owned fields and does not share the committed channel array', () => {
+    const committed = { channels: ['a'], dateBasis: 'publishedAt' as const, from: '2026-09-01', to: '2026-09-15', duration: 'medium', search: 'video', sort: 'title' };
+    const draft = copyPanelFilters(committed); draft.channels.push('b');
+    expect(committed.channels).toEqual(['a']); expect(draft).toEqual({ channels: ['a', 'b'], dateBasis: 'publishedAt', from: '2026-09-01', to: '2026-09-15' });
+    expect(initialPanelFilters()).toEqual({ channels: [], dateBasis: 'likedAt', from: '', to: '' });
+  });
+  it.each([[[], '', '', 0], [['a', 'b', 'c'], '', '', 1], [[], '2026-09-01', '', 1], [['a'], '', '2026-09-15', 2]] as const)(
+    'counts filter groups for %j / %s / %s', (channels, from, to, count) => {
+      expect(panelFilterGroups({ channels: [...channels], dateBasis: 'likedAt', from, to })).toBe(count);
+    });
+  it.each([['', '', true], ['2026-09-15', '2026-09-15', true], ['2026-09-16', '2026-09-15', false], ['2026-02-30', '', false]])(
+    'validates draft dates %s through %s', (from, to, valid) => { expect(validPanelDates({ ...initialPanelFilters(), from, to })).toBe(valid); });
 });
 
 describe('Handoff B status hierarchy and connected account', () => {

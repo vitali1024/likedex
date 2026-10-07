@@ -8,7 +8,7 @@ import type { SyncAttempt } from '../../src/domain/contracts';
 import '../../src/options/options.css';
 import { RuntimeClient } from '../../src/runtime/client';
 import { failure, type RuntimeOperation } from '../../src/runtime/contracts';
-import { optionsAuth, optionsSnapshot } from '../fixtures/options';
+import { channelPickerVideos, optionsAuth, optionsSnapshot } from '../fixtures/options';
 import { attempt, NEXT_ATTEMPT_ID, OBSERVED } from '../fixtures/storage';
 
 export interface OptionsTestControl {
@@ -23,6 +23,7 @@ export interface OptionsTestControl {
 }
 let mode = new URL(location.href).searchParams.get('mode') ?? 'library';
 let snapshot = optionsSnapshot();
+const pickerVideos = channelPickerVideos();
 let revision = 1;
 const listeners = new Set<(event: unknown) => void>();
 const calls: RuntimeOperation[] = [];
@@ -95,6 +96,7 @@ const client = new RuntimeClient({
       return response(auth);
     }
     if (request.operation === 'LIBRARY_SNAPSHOT_GET') {
+      if (mode === 'channel-cases') return response({ ...snapshot, videos: pickerVideos });
       if (mode === 'snapshot-error') return rejected('storage-error');
       if (mode === 'mismatch') return rejected('auth-error', { category: 'owner-mismatch', messageKey: 'owner-mismatch', phase: 'preparing' });
       if (mode === 'loading') await new Promise(() => {});

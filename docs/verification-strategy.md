@@ -47,6 +47,8 @@ Targeted commands reuse subsets of the same tests; they are not divergent altern
 
 ## Targeted real-extension coverage
 
+**Handoff C.1 controls (AC-LIBRARY-011, AC-OPTIONS-003/004, AC-A11Y-006):** retain pure query/DST/duration/sort regression units and assert reusable listbox/trigger structure, direct channel labels/order/collision handling, draft copies/validation/group counts and unavailable controls. Chromium compares count/IDs/page/chips/selection/detail/badge before and during channel/date drafts, then tests combined Apply/page reset/invalidation, all dismissal paths, scoped Clear actions and global Reset including focused detail and unchanged account/Sync/RPC calls. Separate 100-channel fixtures test local search/hidden selections and bounded list scrolling. All three themed menus exercise semantic selection/check, keyboard arrows/Home/End/Enter/Space/Escape/Tab, outside dismissal, sibling ownership and nested Date basis Escape. Structural bounding boxes cover Full Library 800/1024/1200/1440 and Side Panel 320/360/480, stable draft geometry, viewport menus, footer reachability, indicator anchor and overflow; no exact-color assertions. Fixture screenshots are automated previews, not human production smoke. See [unpassed C.1 human procedure](options-ui.md#handoff-c1-human-smoke-still-required). Historical C counts remain historical.
+
 Use Playwright with an extension-capable persistent Chromium context and pinned browser/tool versions. Maintain a separate fixture composition that injects provider/auth responses, while retaining real extension messaging, service worker, IndexedDB, and UI. The production build must neither import fixture modules nor accept a runtime fixture flag. Do not log in to Google in CI.
 
 Keep the suite small:

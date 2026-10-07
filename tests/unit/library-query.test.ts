@@ -23,6 +23,19 @@ describe('Options local queries (AC-LIBRARY-001–010)', () => {
     expect(queryLibrary(rows, { ...INITIAL_QUERY, duration: 'long' })).toHaveLength(2);
     expect(queryLibrary([video('unknown', { availability: { state: 'available', evidence: 'public' } })], { ...INITIAL_QUERY, channels: ['channel-a'] })).toEqual([]);
   });
+  it('filters by stable IDs despite duplicate, renamed or missing channel titles', () => {
+    const source = [{ ...rows[0]!, channelTitle: 'Same name' }, { ...rows[1]!, channelTitle: 'Same name' },
+      { ...rows[2]!, channelTitle: null }];
+    expect(queryLibrary(source, { ...INITIAL_QUERY, channels: ['channel-a'] }).map((entry) => entry.videoId))
+      .toEqual([rows[0]!.videoId, rows[2]!.videoId]);
+    expect(queryLibrary(source.map((entry) => ({ ...entry, channelTitle: 'Renamed' })), { ...INITIAL_QUERY, channels: ['channel-b'] })
+      .map((entry) => entry.videoId)).toEqual([rows[1]!.videoId]);
+  });
+  it('empty channel selection includes known and unknown channel identities without a fake all value', () => {
+    const source = [{ ...rows[0]!, channelId: null }, rows[1]!];
+    expect(queryLibrary(source, { ...INITIAL_QUERY, channels: [] })).toHaveLength(2);
+    expect(queryLibrary(source, { ...INITIAL_QUERY, channels: ['all'] })).toEqual([]);
+  });
   it('uses inclusive local calendar dates with explicit basis; invalid ranges match nothing', () => {
     const day = '2026-09-15', start = dateBoundary(day)!, end = dateBoundary(day, true)!;
     const dated = [start - 1, start, end - 1, end].map((time, i) => ({ ...rows[i]!, likedAt: new Date(time).toISOString() }));

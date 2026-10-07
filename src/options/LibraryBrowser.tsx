@@ -1,10 +1,13 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { MirroredVideo } from '../domain/contracts';
 import { compareText, INITIAL_QUERY, pageOf, queryLibrary, SORTS, youtubeUrl, type LibraryQuery, type Sort } from '../library/query';
 import type { LibraryObservation } from '../runtime/observer';
 import { failureMessage, formatDate, formatDuration } from './presentation';
 import { Disclosure } from './Disclosure';
 import { Icon } from './Icon';
+import { SingleSelect } from './SingleSelect';
+import { channelOptions } from './ChannelMultiSelect';
+import { FilterPanel, panelFilterGroups } from './FilterPanel';
 
 const noop = () => {};
 const shortDate = (date: string) => new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -108,6 +111,9 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectionNotice, setSelectionNotice] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
+  const [floating, setFloating] = useState<'duration' | 'sort' | 'filters' | null>(null);
+  const filterTrigger = useRef<HTMLButtonElement>(null);
+  const filterId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -117,6 +123,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
   const lastRow = useRef<HTMLButtonElement | null>(null);
   const snapshot = observation.status === 'ready' ? observation.snapshot : null;
   const videos = snapshot?.videos;
+  if (!snapshot && floating !== null) setFloating(null);
   const validUntil = snapshot?.validUntil ?? null;
   const rows = useMemo(() => videos ? queryLibrary(videos, query) : [], [videos, query]);
   const page = useMemo(() => pageOf(rows, requestedPage), [rows, requestedPage]);
@@ -131,7 +138,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
       const label = video.channelTitle || 'Channel name unknown', prior = choices.get(video.channelId);
       if (prior === undefined || compareText(label, prior) < 0) choices.set(video.channelId, label);
     }
-    return { availableCount: count, channels: [...choices].sort(([a], [b]) => compareText(a, b)) };
+    return { availableCount: count, channels: channelOptions([...choices].sort(([a], [b]) => compareText(a, b))) };
   }, [videos]);
   // Never keep rendered Authorized Data across the observer's loading/failure barrier.
   if (observation.status === 'unavailable' && (selectedId !== null || query.channels.length)) {
@@ -155,7 +162,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
       if (target instanceof HTMLElement && target.closest('dialog[open]')) return;
       if (event.key === 'Escape' && detailOpen && (compact || window.matchMedia('(max-width: 1279px)').matches)) { back(); return; }
       if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey
-        || (target instanceof HTMLElement && (target.closest('input, textarea, select') || target.isContentEditable))) return;
+        || (target instanceof HTMLElement && (target.closest('input, textarea, select, [role="listbox"], .filter-panel') || target.isContentEditable))) return;
       event.preventDefault();
       if (detailOpen && (compact || window.matchMedia('(max-width: 1279px)').matches)) {
         back(); requestAnimationFrame(() => searchRef.current?.focus());
@@ -189,8 +196,20 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
     if (!compact && window.matchMedia('(min-width: 1280px)').matches) select(next.dataset.videoId, next);
   }, [select, compact]);
   const update = (patch: Partial<LibraryQuery>) => { setQuery({ ...query, ...patch }); setPage(1); if (scrollRef.current) scrollRef.current.scrollTop = 0; };
-  const clearFilters = () => update({ channels: [], duration: '', from: '', to: '' });
   const hasFilters = Boolean(query.channels.length || query.duration || query.from || query.to);
+  const panelFilterCount = snapshot ? panelFilterGroups(query) : 0;
+  const canReset = Boolean(query.search || query.duration || query.channels.length || query.from || query.to
+    || query.dateBasis !== INITIAL_QUERY.dateBasis || query.sort !== INITIAL_QUERY.sort || requestedPage !== 1 || selectedId || detailOpen || selectionNotice);
+  const resetView = () => {
+    setQuery({ ...INITIAL_QUERY, channels: [] }); setPage(1); setSelectedId(null); setDetailOpen(false); setSelectionNotice(''); setFloating(null);
+    lastRow.current = null; scrollPosition.current = 0; pageScrollPosition.current = 0;
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    window.scrollTo(0, 0);
+    // A focused detail route hides the toolbar until this reset has rendered.
+    requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
+  };
+  const resetButton = () => <button type="button" className="reset-view" title="Reset search, filters, sort and current view"
+    disabled={!snapshot || !canReset} onClick={resetView}><Icon name="sync" />Reset view</button>;
   const changePage = (next: number) => { setPage(next); if (scrollRef.current) scrollRef.current.scrollTop = 0; };
   return <section className={`library ${detailOpen && selected ? 'detail-open' : ''}`} aria-label="Local library">
     <div className="toolbar">
@@ -200,28 +219,26 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
         <div className="search-actions">{query.search && <button className="icon-button" aria-label="Clear search" onClick={() => { update({ search: '' }); searchRef.current?.focus(); }}><Icon name="close" /></button>}
           <button className="shortcut" title="Press / to focus search" aria-label="Focus search" onClick={() => searchRef.current?.focus()}>/</button></div>
       </div>
-      <label className="duration-control"><span className="sr-only">Duration</span><select aria-label="Duration" value={query.duration} disabled={!snapshot} onChange={(event) => update({ duration: event.target.value as LibraryQuery['duration'] })}>
-        <option value="">Any duration</option><option value="short">Under 4 minutes</option><option value="medium">4 to under 20 minutes</option><option value="long">20 minutes or longer</option></select></label>
-      <Disclosure className="filters" active={hasFilters} label={<><Icon name="filter" /><span>Filter library</span>{hasFilters && <span className="filter-dot" />}</>}>
-        <div className="filter-controls"><label>Channels<select aria-label="Channels" multiple size={4} value={query.channels} disabled={!snapshot} onChange={(event) =>
-          update({ channels: Array.from(event.target.selectedOptions, (option) => option.value) })}>
-          {channels.map(([id, title]) => <option key={id} value={id}>{title} · {id}</option>)}
-        </select><span className="muted">Choose one or more; none means all.</span></label>
-          <label>Date basis<select aria-label="Date basis" value={query.dateBasis} disabled={!snapshot} onChange={(event) => update({ dateBasis: event.target.value as LibraryQuery['dateBasis'] })}>
-            <option value="likedAt">Liked date</option><option value="publishedAt">Published date</option></select></label>
-          <div className="date-range"><label>From<input type="date" value={query.from} disabled={!snapshot} onChange={(event) => update({ from: event.target.value })} /></label>
-            <label>Through<input type="date" value={query.to} disabled={!snapshot} onChange={(event) => update({ to: event.target.value })} /></label></div>
-          <button onClick={clearFilters} disabled={!snapshot}>Clear filters</button>
-        </div><p className="muted">Dates include both selected local-calendar days. Unknown values do not match an active filter. Publication date never substitutes for date liked.</p>
-        {query.from && query.to && query.from > query.to && <p role="alert">Choose an end date on or after the start date.</p>}
-      </Disclosure>
-      <label className="sort-control"><span className="sr-only">Sort</span><select aria-label="Sort" value={query.sort} onChange={(event) => update({ sort: event.target.value as Sort })} disabled={!snapshot}>
-        {Object.entries(SORTS).map(([value, label]) => <option key={value} value={value}>Sort: {label}</option>)}</select></label>
-      <button className="reset-button" onClick={clearFilters} disabled={!snapshot || !hasFilters} title="Clear filters, keep search"><Icon name="sync" />Reset</button>
+      <div className="duration-control"><SingleSelect label="Duration" value={query.duration} disabled={!snapshot}
+        options={[{ value: '', label: 'Any duration' }, { value: 'short', label: 'Under 4 minutes' }, { value: 'medium', label: '4 to under 20 minutes' }, { value: 'long', label: '20 minutes or longer' }]}
+        open={floating === 'duration'} onOpenChange={(open) => setFloating(open ? 'duration' : null)} onChange={(duration) => update({ duration })} /></div>
+      <div className="filters"><button ref={filterTrigger} type="button" className="filter-trigger" aria-label="Filter library" aria-haspopup="dialog"
+        aria-expanded={floating === 'filters'} aria-controls={floating === 'filters' ? filterId : undefined} disabled={!snapshot} data-active={panelFilterCount > 0 || undefined}
+        onClick={() => setFloating(floating === 'filters' ? null : 'filters')}><Icon name="filter" /><span>Filter library</span>
+        <span className="filter-count" data-empty={!panelFilterCount || undefined} aria-hidden={!panelFilterCount || undefined}><span className="sr-only">Active filter groups: </span>{panelFilterCount || ''}</span>
+        <Icon name="down" className="control-chevron" /></button>
+        {floating === 'filters' && snapshot && <FilterPanel popupId={filterId} committed={query} options={channels} anchor={filterTrigger} onDismiss={() => setFloating(null)}
+          onApply={(draft) => { update(draft); setFloating(null); filterTrigger.current?.focus({ preventScroll: true }); }} />}</div>
+      <div className="sort-control"><SingleSelect label="Sort" prefix="Sort: " value={query.sort} disabled={!snapshot}
+        options={Object.entries(SORTS).map(([value, label]) => ({ value: value as Sort, label }))}
+        open={floating === 'sort'} onOpenChange={(open) => setFloating(open ? 'sort' : null)} onChange={(sort) => update({ sort })} /></div>
+      {resetButton()}
     </div>
-    {hasFilters && <div className="active-filters" aria-label="Active filters">
+    {hasFilters && snapshot && <div className="active-filters" aria-label="Active filters">
       {query.duration && <button onClick={() => update({ duration: '' })}>Duration: {query.duration}<Icon name="close" /></button>}
-      {query.channels.map((id) => <button key={id} onClick={() => update({ channels: query.channels.filter((channel) => channel !== id) })}>{channels.find(([channel]) => channel === id)?.[1] ?? id}<Icon name="close" /></button>)}
+      {snapshot && query.channels.map((id) => { const option = channels.find((channel) => channel.id === id); return <button key={id}
+        onClick={() => update({ channels: query.channels.filter((channel) => channel !== id) })}>{option?.title ?? 'Channel name unknown'}
+        {option?.disambiguator && <span className="chip-identifier">{option.disambiguator}</span>}<Icon name="close" /></button>; })}
       {(query.from || query.to) && <button onClick={() => update({ from: '', to: '' })}>{query.dateBasis === 'likedAt' ? 'Liked' : 'Published'}: {query.from || 'Any'} – {query.to || 'Any'}<Icon name="close" /></button>}
     </div>}
     <div className="library-split">
@@ -234,7 +251,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
           {observation.status === 'loading' && <div className="loading-state"><p role="status">Loading local snapshot…</p><div aria-hidden="true">{Array.from({ length: 5 }, (_, i) => <div className="skeleton-row" key={i}><span /><div><i /><i /><i /></div></div>)}</div></div>}
           {observation.status === 'unavailable' && <div className="empty error" role="alert"><Icon name="info" /><h3>Library unavailable</h3><p>{failureMessage(observation.error)}</p><p>No valid library count is available.</p></div>}
           {snapshot && rows.length === 0 && <div className="empty"><Icon name="search" />
-            {availableCount > 0 ? <><h3>No matching videos</h3><p>Try another search or clear your search and filters.</p><button onClick={() => { setQuery(INITIAL_QUERY); setPage(1); }}>Clear search and filters</button></>
+            {availableCount > 0 ? <><h3>No matching videos</h3><p>Try another search or clear your search and filters.</p><button onClick={resetView}>Clear search and filters</button></>
               : snapshot.videos.length > 0 ? <><h3>No available videos</h3><p>Membership is mirrored, but no video has available metadata from the last check.</p></>
                 : snapshot.sync?.latestSuccessfulSync ? <><h3>Your local mirror is empty</h3><p>The latest successful sync is recorded above. This is a local snapshot, not a live YouTube count.</p></>
                   : snapshot.sync?.currentAttempt ? <><h3>No local videos yet</h3><p>See the current or latest sync result above. This does not mean your YouTube library is empty.</p></>
@@ -253,7 +270,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
           </nav>
         </div>
       </section>
-      <div className="detail-host" ref={detailRef}><VideoDetail key={selected?.videoId ?? 'none'} video={selected} onBack={back} validUntil={validUntil} onExpired={onExpired} /></div>
+      <div className="detail-host" ref={detailRef}><div className="detail-reset-control">{resetButton()}</div><VideoDetail key={selected?.videoId ?? 'none'} video={selected} onBack={back} validUntil={validUntil} onExpired={onExpired} /></div>
     </div>
   </section>;
 });
