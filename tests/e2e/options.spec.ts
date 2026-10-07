@@ -683,9 +683,9 @@ for (const surface of ['options', 'sidepanel']) {
     await page.close();
   });
 
-  test(surface + ': Reset view restores the whole local view including focused detail', async () => {
+  test(surface + ': Back preserves browsing state and library Reset view restores defaults', async () => {
     const page = await open('library', true, surface);
-    await page.setViewportSize({ width: surface === 'options' ? 1440 : 360, height: 900 });
+    await page.setViewportSize({ width: surface === 'options' ? 1200 : 360, height: 900 });
     await expect(page.locator('.video-row')).toHaveCount(50);
     const reset = page.getByRole('button', { name: 'Reset view', exact: true }).filter({ visible: true });
     await expect(reset).toBeDisabled(); await expect(reset).toHaveAttribute('title', 'Reset search, filters, sort and current view');
@@ -696,11 +696,25 @@ for (const surface of ['options', 'sidepanel']) {
     await choose(page, 'Date basis', 'Published date'); await page.getByLabel('From', { exact: true }).fill('2026-09-15');
     await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
     await page.getByRole('button', { name: 'Next page' }).click(); await page.locator('.video-row').first().click();
-    if (surface === 'sidepanel') await page.getByRole('button', { name: 'View details', exact: true }).click();
-    else await page.getByRole('button', { name: 'Sort', exact: true }).click();
+    const invokingControl = surface === 'sidepanel' ? page.getByRole('button', { name: 'View details', exact: true }) : page.locator('.video-row').first();
+    if (surface === 'sidepanel') await invokingControl.click();
     const account = await page.locator('.header-account').textContent();
     const sync = await page.locator('.header-sync summary').textContent();
     const calls = await page.evaluate(() => [...(window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls]);
+    const selectedId = await page.locator('.video-row').first().getAttribute('data-video-id');
+    await expect(page.getByRole('button', { name: 'Back to library', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reset view', exact: true, includeHidden: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back to library', exact: true }).click();
+    await page.clock.runFor(20);
+    await expect(invokingControl).toBeFocused();
+    await expect(page.getByLabel('Search library')).toHaveValue('video');
+    await expect(page.getByRole('button', { name: 'Duration', exact: true })).toContainText('20 minutes or longer');
+    await expect(page.getByRole('button', { name: 'Sort', exact: true })).toContainText('Title A–Z');
+    await expect(page.getByText('Page 2 of 3')).toBeVisible();
+    await expect(page.locator('.video-row[aria-pressed="true"], .video-row[aria-expanded="true"]')).toHaveAttribute('data-video-id', selectedId!);
+    await expect(page.locator('.filter-count')).toHaveText('Active filter groups: 2');
+    await expect(reset).toBeVisible();
+    if (surface === 'options') await page.getByRole('button', { name: 'Sort', exact: true }).click();
     await reset.click();
     await expect(page.getByLabel('Search library')).toHaveValue(''); await expect(page.getByRole('button', { name: 'Duration', exact: true })).toContainText('Any duration');
     await expect(page.getByRole('button', { name: 'Sort', exact: true })).toContainText('Liked newest');
@@ -717,6 +731,36 @@ for (const surface of ['options', 'sidepanel']) {
     await expect(page.getByRole('searchbox', { name: 'Search channels', exact: true })).toHaveValue('');
     await expect(page.getByRole('checkbox', { name: 'Travel', exact: true })).not.toBeChecked(); await expect(page.getByLabel('From', { exact: true })).toHaveValue('');
     await expect(page.getByRole('button', { name: 'Date basis', exact: true })).toContainText('Liked date');
+    await page.close();
+  });
+
+  test(surface + ': detail navigation has only Back with no leftover reset row', async () => {
+    const page = await open('library', true, surface);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    for (const width of surface === 'options' ? [1200, 800] : [360, 480]) {
+      await page.setViewportSize({ width, height: 900 });
+      const reset = page.getByRole('button', { name: 'Reset view', exact: true });
+      await expect(reset).toBeVisible();
+      const row = page.locator('.video-row').first();
+      if (surface === 'options' || await row.getAttribute('aria-expanded') !== 'true') await row.click();
+      if (surface === 'sidepanel') await page.getByRole('button', { name: 'View details', exact: true }).click();
+      const back = page.getByRole('button', { name: 'Back to library', exact: true });
+      await expect(back).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Reset view', exact: true, includeHidden: true })).toHaveCount(0);
+      await expect(page.locator('.detail-reset-control')).toHaveCount(0);
+      const header = (await page.locator('.app-header').boundingBox())!;
+      const control = (await back.boundingBox())!;
+      expect(control.y - (header.y + header.height)).toBeGreaterThanOrEqual(0);
+      expect(control.y - (header.y + header.height)).toBeLessThan(24);
+      const thumbnail = (await page.locator('.detail .thumbnail-large').boundingBox())!;
+      expect(thumbnail.width).toBeLessThanOrEqual(640);
+      expect(Math.abs(thumbnail.width / thumbnail.height - 16 / 9)).toBeLessThan(.01);
+      expect(thumbnail.y - (control.y + control.height)).toBeCloseTo(12, 0);
+      await page.screenshot({ path: resolve(`.output/detail-navigation-${surface}-${width}.png`), animations: 'disabled' });
+      await back.click(); await page.clock.runFor(20);
+      await expect(reset).toBeVisible();
+      await expect(surface === 'sidepanel' ? page.getByRole('button', { name: 'View details', exact: true }) : row).toBeFocused();
+    }
     await page.close();
   });
 

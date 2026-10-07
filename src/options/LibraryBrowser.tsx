@@ -204,13 +204,13 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
     lastRow.current = null; scrollPosition.current = 0; pageScrollPosition.current = 0;
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     window.scrollTo(0, 0);
-    // A focused detail route hides the toolbar until this reset has rendered.
     requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
   };
   const resetButton = () => <button type="button" className="reset-view" title="Reset search, filters, sort and current view"
     disabled={!snapshot || !canReset} onClick={resetView}><Icon name="sync" />Reset view</button>;
   const changePage = (next: number) => { setPage(next); if (scrollRef.current) scrollRef.current.scrollTop = 0; };
-  return <section className={`library ${detailOpen && selected ? 'detail-open' : ''}`} aria-label="Local library">
+  const showingDetail = detailOpen && selected !== null;
+  return <section className={`library ${showingDetail ? 'detail-open' : ''}`} aria-label="Local library">
     <div className="toolbar">
       <div className="search-control"><Icon name="search" />
         <input ref={searchRef} type="search" aria-label="Search library" placeholder={snapshot ? `Search ${availableCount.toLocaleString()} available videos…` : 'Search titles and channels'} value={query.search}
@@ -231,7 +231,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
       <div className="sort-control"><SingleSelect label="Sort" prefix="Sort: " value={query.sort} disabled={!snapshot}
         options={Object.entries(SORTS).map(([value, label]) => ({ value: value as Sort, label }))}
         open={floating === 'sort'} onOpenChange={(open) => setFloating(open ? 'sort' : null)} onChange={(sort) => update({ sort })} /></div>
-      {resetButton()}
+      {!showingDetail && resetButton()}
     </div>
     {hasFilters && snapshot && <div className="active-filters" aria-label="Active filters">
       {query.duration && <button onClick={() => update({ duration: '' })}>Duration: {query.duration}<Icon name="close" /></button>}
@@ -270,7 +270,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
           </nav>
         </div>
       </section>
-      <div className="detail-host" ref={detailRef}><div className="detail-reset-control">{resetButton()}</div><VideoDetail key={selected?.videoId ?? 'none'} video={selected} onBack={back} validUntil={validUntil} onExpired={onExpired} /></div>
+      <div className="detail-host" ref={detailRef}><VideoDetail key={selected?.videoId ?? 'none'} video={selected} onBack={back} validUntil={validUntil} onExpired={onExpired} /></div>
     </div>
   </section>;
 });

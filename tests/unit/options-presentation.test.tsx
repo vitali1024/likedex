@@ -39,6 +39,7 @@ describe('Options presentation (AC-OPTIONS-001, AC-SYNC-005/007/011/013)', () =>
     const html = renderToStaticMarkup(<LibraryBrowser observation={{ status: 'ready', snapshot: optionsSnapshot() }} />);
     expect(html.match(/class="video-row"/g)).toHaveLength(50); expect(html).toContain('62 available videos');
     const detail = renderToStaticMarkup(<VideoDetail video={optionsVideos()[1]!} onBack={() => {}} />);
+    expect(detail).toContain('Back to library'); expect(detail).not.toContain('Reset view');
     expect(detail).toContain('Date liked unknown'); expect(detail).toContain('https://www.youtube.com/watch?v=v0000000001');
   });
   it('shows a closed-gate rejection without inventing activity', () => {
@@ -78,11 +79,12 @@ describe('Handoff C.1 themed selects, direct channels and drafts', () => {
     expect(html).toContain('disabled=""'); expect(html).not.toContain('channel-section'); expect(html).not.toContain('Travel');
     expect(html).not.toContain('Music'); expect(html).not.toContain('multiple=');
   });
-  it('restores Reset view and retains no permanent helper prose/native selects', () => {
-    const html = renderToStaticMarkup(<LibraryBrowser observation={{ status: 'ready', snapshot: optionsSnapshot() }} />);
+  it.each([false, true])('keeps Reset view on the library toolbar (compact=%s) without a detail reset row', (compact) => {
+    const html = renderToStaticMarkup(<LibraryBrowser compact={compact} observation={{ status: 'ready', snapshot: optionsSnapshot() }} />);
     expect(html.match(/class="single-select"/g)).toHaveLength(2);
     expect(html).toContain('Reset view'); expect(html).toContain('Reset search, filters, sort and current view'); expect(html).not.toContain('Choose one or more');
     expect(html).not.toContain('Dates include both'); expect(html).not.toContain('multiple=');
+    expect(html.match(/Reset view/g)).toHaveLength(1); expect(html).not.toContain('detail-reset-control');
   });
   it('exposes a single selected marker/semantic state and active current choice in the listbox', () => {
     const html = renderToStaticMarkup(<SingleSelect label="Sort" value="b" options={[{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]}
