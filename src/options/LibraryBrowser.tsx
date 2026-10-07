@@ -74,7 +74,6 @@ export function VideoDetail({ video, onBack, validUntil = null, onExpired = noop
       <dl><div><dt><Icon name="heart" />Date liked</dt><dd>{video.likedAt ? formatDate(video.likedAt) : 'Date liked unknown'}</dd></div>
         <div><dt><Icon name="calendar" />Published</dt><dd>{formatDate(video.publishedAt)}</dd></div>
         <div><dt><Icon name="clock" />Duration</dt><dd>{formatDuration(video.durationSeconds)}</dd></div></dl>
-      <p className="availability-note"><Icon name="info" />Available at last metadata check. Availability is not a guarantee of playback.</p>
       {video.description && <div className="description"><h3>Description</h3><p>{video.description}</p></div>}
     </div>
   </aside>;
@@ -246,6 +245,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
         <div className="results-heading"><h2>{snapshot ? <><span>{rows.length.toLocaleString()} results</span> in available videos</> : 'Library'}</h2>
           {snapshot && <Disclosure className="count-info" label={<><Icon name="info" /><span className="sr-only">About library counts</span></>}>
             <p>{availableCount} available videos · {snapshot.videos.length} mirrored memberships</p><p className="muted">Private, deleted, and unknown-availability memberships stay out of the main list. Counts reflect the local snapshot.</p>
+            <p className="muted">Availability reflects the last metadata check; playback can change later on YouTube.</p>
           </Disclosure>}</div>
         <div className="results-scroll" ref={scrollRef}>
           {observation.status === 'loading' && <div className="loading-state"><p role="status">Loading local snapshot…</p><div aria-hidden="true">{Array.from({ length: 5 }, (_, i) => <div className="skeleton-row" key={i}><span /><div><i /><i /><i /></div></div>)}</div></div>}
@@ -261,7 +261,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
             validUntil={validUntil} onExpired={onExpired} onSelect={select} onNavigate={navigate} compact={compact} onDetails={openDetails} />)}</ul>}
         </div>
         <p role="status" className="selection-notice muted">{selectionNotice}</p>
-        <div className="results-footer"><span className="muted">{snapshot ? `${availableCount} available videos · ${snapshot.videos.length} mirrored memberships` : 'Counts unavailable'}</span>
+        <div className="results-footer">
           <nav className="pagination" aria-label="Library pagination">
             <button className="icon-button" aria-label="Previous page" disabled={!snapshot || page.page === 1} onClick={() => changePage(page.page - 1)}><Icon name="chevron" className="reverse" /></button>
             {snapshot && pageNumbers(page.page, page.pages).map((number) => typeof number === 'number' ? <button key={number} aria-label={`Go to page ${number}`} aria-current={number === page.page ? 'page' : undefined} onClick={() => changePage(number)}>{number}</button> : <span key={number}>…</span>)}

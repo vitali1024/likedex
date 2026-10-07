@@ -53,7 +53,8 @@ test('Options Connect uses native worker fetch with its required receiver', asyn
     await expect(diagnostic).toHaveCount(0);
     await worker.evaluate(() => { (globalThis as unknown as { nativeFetchFailure: boolean }).nativeFetchFailure = false; });
     await page.getByRole('button', { name: 'Connect YouTube', exact: true }).click();
-    await expect(page.getByText('YouTube connected · read-only')).toBeVisible();
+    await expect(page.locator('.header-account summary')).toHaveAccessibleDescription('Connected to YouTube. Read-only access.');
+    await expect(page.locator('.header-account summary').getByText('Read-only', { exact: true })).toBeVisible();
     const checks = await worker.evaluate(() => (globalThis as unknown as { nativeFetchChecks: unknown[] }).nativeFetchChecks);
     expect(checks.length).toBeGreaterThan(0);
     expect(checks.every((check) => JSON.stringify(check) === JSON.stringify({ correctUrl: true, bearerCorrect: true, method: 'GET', activeSignal: true }))).toBe(true);
@@ -104,7 +105,8 @@ test('separate validation package uses Options Connect, observes without writes,
     await expect(options.getByRole('button', { name: 'Connect YouTube', exact: true })).toBeDisabled();
     await options.getByRole('checkbox').check();
     await options.getByRole('button', { name: 'Connect YouTube', exact: true }).click();
-    await expect(options.getByText('YouTube connected · read-only')).toBeVisible();
+    await expect(options.locator('.header-account summary')).toHaveAccessibleDescription('Connected to YouTube. Read-only access.');
+    await expect(options.locator('.header-account summary').getByText('Read-only', { exact: true })).toBeVisible();
     await options.getByRole('link', { name: 'open non-destructive provider observation' }).click();
     const page = options;
     await expect(page.getByRole('heading', { name: 'DEVELOPMENT / RELEASE VALIDATION ONLY' })).toBeVisible();

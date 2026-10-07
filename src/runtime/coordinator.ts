@@ -144,7 +144,9 @@ export class RuntimeCoordinator {
     if (this.lifecycleFailure !== null) await this.enforceLifecycle();
     switch (request.operation) {
       case 'AUTH_STATUS_GET': {
-        if (this.syncAuthorizationPending || this.authorizationCheck !== null) {
+        // Only the Sync owner's unresolved check has pending semantics.
+        // Ordinary companion reads await authorize()'s shared promise below.
+        if (this.syncAuthorizationPending) {
           const control = await this.repository.readControl();
           return { status: 'validation-pending', control: this.authControl(control) };
         }

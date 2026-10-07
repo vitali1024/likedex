@@ -317,6 +317,115 @@ describe('Runtime local data/auth and failure truth (AC-AUTH-001/002/003/007/009
 });
 
 describe('Runtime active sync/recovery (AC-SYNC-003/004/007/008/012)', () => {
+  it.each(['LIBRARY_SNAPSHOT_GET', 'AUTH_STATUS_GET'] as const)('D+.2 companion bootstrap shares ordinary authorization when %s arrives first', async (firstOperation) => {
+    const h = await setup({ seed: true });
+    const pending = held<Response>(); h.fetcher.mockReturnValue(pending.promise);
+    const inspection = vi.spyOn(h.auth, 'inspectAuthenticationState');
+    const first = h.client().request(firstOperation);
+    await vi.waitFor(() => expect(h.fetcher).toHaveBeenCalledTimes(1));
+    const second = h.client().request(firstOperation === 'LIBRARY_SNAPSHOT_GET' ? 'AUTH_STATUS_GET' : 'LIBRARY_SNAPSHOT_GET');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    pending.resolve(json());
+    const [a, b] = await Promise.all([first, second]);
+    const identity = firstOperation === 'AUTH_STATUS_GET' ? a : b;
+    const library = firstOperation === 'LIBRARY_SNAPSHOT_GET' ? a : b;
+    expect(identity).toMatchObject({ ok: true, result: { status: 'authorized' } });
+    expect(library).toMatchObject({ ok: true, result: { videos: [expect.objectContaining({ videoId: 'video-a' })] } });
+    expect(inspection).toHaveBeenCalledTimes(1); expect(h.fetcher).toHaveBeenCalledTimes(1);
+    if (!identity.ok || !library.ok) throw new Error('bootstrap failed');
+    const authResult = resultSchemas.AUTH_STATUS_GET.parse(identity.result), snapshot = resultSchemas.LIBRARY_SNAPSHOT_GET.parse(library.result);
+    expect(authResult.control.authEpoch).toBe(snapshot.authEpoch);
+    expect(authResult.control.dataGeneration).toBe(snapshot.dataGeneration);
+  });
+
+  it('D+.2 delayed companion auth response cannot invalidate the successful healthy bootstrap', async () => {
+    const h = await setup({ seed: true });
+    const remote = held<Response>(), entered = held<unknown>(), controlRead = held<unknown>();
+    let released = false;
+    h.fetcher.mockImplementation(() => { entered.resolve(null); return remote.promise; });
+    const counts: Partial<Record<RuntimeOperation, number>> = {};
+    const client = new RuntimeClient({ subscribe: () => () => {}, async send(message) {
+      counts[message.operation] = (counts[message.operation] ?? 0) + 1;
+      if (message.operation === 'AUTH_STATUS_GET') {
+        await entered.promise;
+        const readControl = h.repository.readControl.bind(h.repository);
+        vi.spyOn(h.repository, 'readControl').mockImplementation(async () => {
+          // Model an IDB control read finishing after the snapshot's shared
+          // authorization has committed, without changing any returned DTO.
+          if (!released) await controlRead.promise;
+          return readControl();
+        });
+      }
+      return h.coordinator.handle(message, SENDER);
+    } });
+    let library: LibraryObservation = { status: 'loading' }, identity: AuthObservation = { status: 'loading' };
+    const states: { library: LibraryObservation; auth: AuthObservation }[] = [];
+    const surface = createOptionsRuntime(client, {
+      library(value) { library = value; states.push({ library, auth: identity }); },
+      auth(value) { identity = value; states.push({ library, auth: identity }); }, stamp: () => {},
+    }, { now: h.clock, scheduler: h.timers.scheduler });
+    try {
+      const mounted = surface.resumeIfNeeded();
+      await vi.waitFor(() => expect(h.fetcher).toHaveBeenCalledTimes(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      released = true; remote.resolve(json());
+      await vi.waitFor(() => expect(library.status).toBe('ready'));
+      controlRead.resolve(null); await mounted;
+      expect(states.some((state) => state.library.status === 'unavailable')).toBe(false);
+      expect(states.some((state) => state.library.status === 'ready' && state.auth.status === 'ready' && state.auth.value.status === 'validation-pending')).toBe(false);
+      expect(identity).toMatchObject({ status: 'ready', value: { status: 'authorized' } });
+      expect(counts).toEqual({ LIBRARY_SNAPSHOT_GET: 1, AUTH_STATUS_GET: 1 });
+      expect(h.fetcher).toHaveBeenCalledTimes(1);
+      expect(h.timers.jobs.filter((job) => !job.cancelled && job.delay === 2000)).toHaveLength(0);
+    } finally { released = true; remote.resolve(json()); controlRead.resolve(null); surface.dispose(); }
+  });
+
+  it('D+.2 real worker revisions converge without a successful-bootstrap recovery timer', async () => {
+    const h = await setup({ seed: true });
+    const inspection = vi.spyOn(h.auth, 'inspectAuthenticationState');
+    const calls: RuntimeOperation[] = [];
+    const workerClient = h.client();
+    const client = new RuntimeClient({ subscribe: (listener) => workerClient.subscribe(listener), send(message) {
+      calls.push(message.operation); return h.coordinator.handle(message, SENDER);
+    } });
+    let library: LibraryObservation = { status: 'loading' }, auth: AuthObservation = { status: 'loading' };
+    const states: string[] = [];
+    const surface = createOptionsRuntime(client, { library(value) { library = value; states.push(value.status); },
+      auth(value) { auth = value; }, stamp: () => {} }, { now: h.clock, scheduler: h.timers.scheduler });
+    try {
+      await surface.resumeIfNeeded();
+      await vi.waitFor(() => expect(auth).toMatchObject({ status: 'ready', value: { status: 'authorized' } }));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(library.status).toBe('ready'); expect(states).not.toContain('unavailable');
+      expect(h.fetcher).toHaveBeenCalledTimes(1);
+      expect(h.timers.jobs.filter((job) => !job.cancelled && job.delay === 2000)).toHaveLength(0);
+      expect({ snapshot: calls.filter((op) => op === 'LIBRARY_SNAPSHOT_GET').length,
+        auth: calls.filter((op) => op === 'AUTH_STATUS_GET').length, inspections: inspection.mock.calls.length }).toEqual({ snapshot: 2, auth: 2, inspections: 2 });
+    } finally { surface.dispose(); }
+  });
+
+  it('D+.2 fresh document in a validated worker uses one companion pair and no provider request or recovery retry', async () => {
+    const h = await setup({ seed: true });
+    expect(await h.client().request('AUTH_STATUS_GET')).toMatchObject({ ok: true, result: { status: 'authorized' } });
+    h.fetcher.mockClear();
+    const inspection = vi.spyOn(h.auth, 'inspectAuthenticationState');
+    const calls: RuntimeOperation[] = [];
+    const workerClient = h.client();
+    const client = new RuntimeClient({ subscribe: (listener) => workerClient.subscribe(listener), send(message) {
+      calls.push(message.operation); return h.coordinator.handle(message, SENDER);
+    } });
+    let library: LibraryObservation = { status: 'loading' }, auth: AuthObservation = { status: 'loading' };
+    const surface = createOptionsRuntime(client, { library(value) { library = value; }, auth(value) { auth = value; }, stamp: () => {} },
+      { now: h.clock, scheduler: h.timers.scheduler });
+    try {
+      await surface.resumeIfNeeded();
+      expect(library.status).toBe('ready'); expect(auth).toMatchObject({ status: 'ready', value: { status: 'authorized' } });
+      expect(calls).toEqual(['LIBRARY_SNAPSHOT_GET', 'AUTH_STATUS_GET']);
+      expect(inspection).toHaveBeenCalledTimes(1); expect(h.fetcher).not.toHaveBeenCalled();
+      expect(h.timers.jobs.filter((job) => !job.cancelled && job.delay === 2000)).toHaveLength(0);
+    } finally { surface.dispose(); }
+  });
+
   it('overlaps snapshot/auth requests with six real page commits under an advancing clock', async () => {
     const h = await setup({ seed: true, gate: true, advancingClock: true });
     const pages = Array.from({ length: 6 }, () => held<Response>());
@@ -368,6 +477,7 @@ describe('Runtime active sync/recovery (AC-SYNC-003/004/007/008/012)', () => {
     const pendingStatus = await panel.request('SYNC_STATUS_GET');
     expect(pendingStatus).toMatchObject({ ok: true, result: { status: 'validation-pending', attempt: first.result.attempt } });
     expect(JSON.stringify(pendingStatus)).not.toMatch(/owner-a|rawItems|latestSuccessfulSync|localMembershipCount/);
+    expect(await panel.request('AUTH_STATUS_GET')).toMatchObject({ ok: true, result: { status: 'validation-pending' } });
     expect(await options.request('LIBRARY_SNAPSHOT_GET')).toMatchObject({ ok: false, error: { code: 'authorization-pending' } });
     bootstrap.resolve(json());
     await vi.waitFor(() => expect(h.fetcher).toHaveBeenCalledTimes(2));

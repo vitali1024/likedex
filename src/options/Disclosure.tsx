@@ -1,11 +1,12 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Icon } from './Icon';
 
 // Native disclosures retain keyboard activation; dismissal restores the trigger.
-export function Disclosure({ label, children, className = '', active = false }: {
-  label: ReactNode; children: ReactNode; className?: string; active?: boolean;
+export function Disclosure({ label, children, className = '', active = false, ariaLabel, description, describedBy }: {
+  label: ReactNode; children: ReactNode; className?: string; active?: boolean; ariaLabel?: string; description?: string; describedBy?: string | undefined;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
+  const descriptionId = useId();
   useEffect(() => {
     const dismiss = (event: PointerEvent | KeyboardEvent) => {
       const node = ref.current;
@@ -20,6 +21,7 @@ export function Disclosure({ label, children, className = '', active = false }: 
     return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', dismiss); };
   }, []);
   return <details ref={ref} className={`disclosure ${className}`} data-active={active || undefined}>
-    <summary>{label}<Icon name="down" /></summary><div className="disclosure-content">{children}</div>
+    <summary aria-label={ariaLabel} aria-describedby={description ? descriptionId : describedBy}>{label}<Icon name="down" />
+      {description && <span className="sr-only" id={descriptionId}>{description}</span>}</summary><div className="disclosure-content">{children}</div>
   </details>;
 }

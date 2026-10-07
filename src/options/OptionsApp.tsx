@@ -8,7 +8,7 @@ import { useOptionsRuntime } from './use-options-runtime';
 import { Icon } from './Icon';
 import { BrandMark } from './BrandMark';
 import { ConnectedAccount } from './ConnectedAccount';
-import { SyncStatus } from './SyncStatus';
+import { SyncStatus, syncStatusState } from './SyncStatus';
 
 export { SyncStatus } from './SyncStatus';
 
@@ -80,19 +80,32 @@ export function OptionsApp({ client, surface = 'options' }: { client: RuntimeCli
     } finally { mutation.current = false; setStarting(false); }
   };
   const needsConnect = disconnected || (auth.status === 'unavailable' && auth.error.detail?.category === 'authentication');
+  const coherent = identity?.status === 'authorized' && library.status === 'ready';
+  const sync = library.status === 'ready' ? library.snapshot.sync : null;
+  const state = syncStatusState(sync);
+  const expandedSync = coherent && (state.active || state.partiallyUpdated || state.attempt?.error || (state.attempt && !state.sameSuccess));
+  // A fresh document may receive companion replies in either order. Do not
+  // expose ready rows/Sync until the existing identity/context gate also opens.
+  const viewLibrary = library.status === 'ready' && (auth.status === 'loading' || authValue?.status === 'validation-pending')
+    ? { status: 'loading' as const } : library;
   return <main className={`options-app ${surface === 'sidepanel' ? 'compact-app' : ''}`}>
     <header className="app-header"><div className="brand"><BrandMark /><div><h1>Likedex</h1><p>Your likes, within reach.</p></div></div>
+      <div className="header-status">
+        <section className="header-account" aria-label="YouTube connection">
+          {coherent ? <ConnectedAccount bootstrap={identity.bootstrap} />
+            : <span className="status-placeholder" role={auth.status === 'loading' || authValue?.status === 'validation-pending' ? 'status' : undefined}>
+              {auth.status === 'loading' ? 'Checking connection…' : authValue?.status === 'validation-pending' ? 'Checking YouTube authorization…'
+                : mismatch ? 'Connection needs attention' : needsConnect ? 'Not connected' : auth.status === 'unavailable' ? 'Connection unavailable' : 'Checking connection…'}</span>}
+        </section>
+        {coherent ? <SyncStatus sync={sync} mode="header" /> : <span className="header-sync-placeholder status-placeholder" aria-hidden="true">Sync status pending</span>}
+      </div>
       <div className="header-actions">
         <button onClick={() => { void start(); }} disabled={!agreed || disconnected || !identity || mismatch || active || connecting || starting}>
           <Icon name="sync" className={active || starting ? 'spinning' : ''} />{starting ? 'Requesting sync…' : active ? 'Sync in progress' : 'Sync'}</button>
         <button className="icon-button" aria-label="Privacy & terms" title="Privacy & terms" onClick={() => privacyDialog.current?.showModal()}><Icon name="shield" /></button>
       </div></header>
-    <section className={`connection ${identity?.status === 'authorized' ? 'connected' : ''}`} aria-label="YouTube connection">
-      {auth.status === 'loading' && <p role="status">Loading connection status…</p>}
+    {(needsConnect || mismatch || auth.status === 'unavailable' || !agreed || connecting) && <section className="connection" aria-label="Connection guidance">
       {auth.status === 'unavailable' && <div role="alert"><h2>Connection status unavailable</h2><p>{failureMessage(auth.error)}</p></div>}
-      {authValue?.status === 'validation-pending' && <p role="status">Checking YouTube authorization…</p>}
-      {identity?.status === 'authorized' && <><ConnectedAccount bootstrap={identity.bootstrap} />
-        {library.status === 'ready' && !library.snapshot.sync?.currentAttempt && !library.snapshot.sync?.latestSuccessfulSync && <p>Connected, never synced. Use Sync to create a local mirror.</p>}</>}
       {mismatch && identity.status === 'owner-mismatch' && <div role="alert"><h2>Different YouTube channel</h2>
         <p>Local library owner: <span className="channel-id">{identity.localOwnerChannelId}</span></p>
         <p>Connected channel: {identity.bootstrap.channelTitle || 'Name unknown'} · <span className="channel-id">{identity.bootstrap.channelId}</span></p>
@@ -106,7 +119,7 @@ export function OptionsApp({ client, surface = 'options' }: { client: RuntimeCli
         {connecting ? 'Connecting YouTube…' : 'Connect YouTube'}</button>}
       {connecting && <p role="status">Waiting for your explicit YouTube authorization…</p>}
       {auth.status === 'unavailable' && <button onClick={() => { void refresh(); }}>Retry connection status</button>}
-    </section>
+    </section>}
     {actionError && <div className="action-message" role={actionError.code === 'provider-validation-required' ? 'status' : 'alert'}>{failureMessage(actionError)}</div>}
     {localError && <p role="alert" className="error">{localError}</p>}
     {agreed && library.status === 'ready' ? <>
@@ -114,13 +127,15 @@ export function OptionsApp({ client, surface = 'options' }: { client: RuntimeCli
         expiry: 'Local data expired and was removed. Your YouTube likes were not changed.',
         'authorization-invalid': 'Authorization was invalid; associated local data was removed.',
         'authorization-unverified': 'Authorization could not be verified; associated local data was removed.' })[library.snapshot.lastCleanupReason]}</p>}
-      <SyncStatus sync={library.snapshot.sync} /></>
-      : <section className="sync-status" aria-label="Synchronization status"><p role={library.status === 'loading' ? 'status' : 'alert'}>
+      {coherent && !state.attempt && !state.success && <p className="muted">Connected, never synced. Use Sync to create a local mirror.</p>}
+      {expandedSync && <SyncStatus sync={sync} mode="strip" />}</>
+      : (library.status !== 'loading' || !agreed) && <section className="sync-status" aria-label="Synchronization status"><p role="alert">
         {!agreed ? 'Read the privacy notice and record your agreement before using connected features.'
           : library.status === 'loading' ? 'Loading sync status…' : 'Sync status unavailable. Local runtime truth could not be retrieved.'}</p>
         {acknowledged && <p>Runtime acknowledged {ATTEMPT_LABELS[acknowledged.attempt.state].toLowerCase()}; awaiting an eligible snapshot.</p>}</section>}
+    {acknowledged && library.status === 'loading' && <p className="muted">Runtime acknowledged {ATTEMPT_LABELS[acknowledged.attempt.state].toLowerCase()}; awaiting an eligible snapshot.</p>}
     {library.status === 'unavailable' && <button onClick={() => { void refresh(); }}>Retry local snapshot</button>}
-    {agreed && !disconnected && <LibraryBrowser key={stamp} observation={library} compact={surface === 'sidepanel'} onExpired={refreshExpired} />}
+    {agreed && !disconnected && <LibraryBrowser key={stamp} observation={viewLibrary} compact={surface === 'sidepanel'} onExpired={refreshExpired} />}
     <dialog ref={privacyDialog} className="privacy-dialog" aria-labelledby="privacy-title" aria-describedby="privacy-description" onClick={(event) => {
       if (event.target === event.currentTarget) privacyDialog.current?.close();
     }}><div className="dialog-body"><div className="dialog-heading"><h2 id="privacy-title">Privacy &amp; terms</h2>

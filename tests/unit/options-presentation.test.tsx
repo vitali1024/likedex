@@ -145,7 +145,7 @@ describe('Handoff B status hierarchy and connected account', () => {
     const html = renderToStaticMarkup(<SyncStatus sync={{ ...optionsSnapshot().sync!,
       currentAttempt: attempt({ state: 'success', finishedAt: OBSERVED }) }} />);
     const primary = html.split('<details')[0]!;
-    expect(primary).toContain('Sync complete'); expect(primary).toContain('2 mirrored memberships');
+    expect(primary).toContain('Sync complete'); expect(primary).toContain('2 mirrored');
     expect(primary).toContain('Updated'); expect(primary.match(/<time /g)).toHaveLength(1);
     expect(primary).not.toContain('pages accepted'); expect(html).not.toContain('Last successful sync:');
     expect(html).not.toContain('role="progressbar"');
@@ -177,9 +177,118 @@ describe('Handoff B status hierarchy and connected account', () => {
   });
   it.each(['My channel', undefined, '   '])('keeps normal account identity and read-only truth with title %s', (channelTitle) => {
     const html = renderToStaticMarkup(<ConnectedAccount bootstrap={{ channelId: 'owner-a', channelTitle, likesPlaylistId: 'likes-owner-a' }} />);
-    const primary = html.split('<details')[0]!;
-    expect(primary).toContain(channelTitle?.trim() || 'YouTube channel'); expect(primary).toContain('read-only');
+    const primary = html.split('</summary>')[0]!;
+    expect(primary).toContain(channelTitle?.trim() || 'YouTube channel'); expect(primary).toContain('Read-only'); expect(primary).toContain('Connected');
     expect(primary).not.toContain('owner-a'); expect(html).toContain('Connection details');
-    expect(html).toContain('Channel ID: owner-a'); expect(html).not.toContain('<details open');
+    expect(html).toContain('<dt>Channel ID</dt><dd class="channel-id">owner-a</dd>'); expect(html).not.toContain('<details open');
+  });
+});
+
+describe('Handoff D+ structured details and library polish', () => {
+  const render = (currentAttempt: ReturnType<typeof attempt> | null, latestSuccessfulSync = success()) =>
+    renderToStaticMarkup(<SyncStatus sync={{ ...optionsSnapshot().sync!, currentAttempt, latestSuccessfulSync }} />);
+  it('combines matching success diagnostics and finalized results once with truthful labels', () => {
+    const html = render(attempt({ state: 'success', finishedAt: OBSERVED, estimatedTotal: 3548, rawItems: 3548, uniqueMembership: 3400 }));
+    for (const group of ['Status', 'Scan', 'Library snapshot', 'Changes', 'Timing']) expect(html).toContain(`<h4>${group}</h4>`);
+    expect(html.match(/<h4>Changes<\/h4>/g)).toHaveLength(1);
+    expect(html.match(/<dt>Completed<\/dt>/g)).toHaveLength(1);
+    expect(html).toContain('<dt>Provider estimate</dt><dd>~3,548</dd>');
+    expect(html).toContain('<dt>Unique videos observed</dt><dd>3,400</dd>');
+    expect(html).toContain('<dt>Refreshed</dt>'); expect(html).toContain('<dt>Removed</dt>');
+    expect(html).not.toContain('Current attempt'); expect(html).not.toContain('Last successful snapshot');
+    expect(html).not.toContain(' updated'); expect(html).not.toContain('raw items processed');
+    expect(html.match(/role="status"/g)).toHaveLength(1);
+    expect(html).toContain('role="status">Sync complete</p>');
+  });
+  it.each(['ownerChannelId', 'dataGeneration'] as const)('keeps success events separate on %s mismatch', (field) => {
+    const html = render(attempt({ state: 'success', finishedAt: OBSERVED,
+      ...(field === 'ownerChannelId' ? { ownerChannelId: 'other-owner' } : { dataGeneration: 1 }) }));
+    expect(html).toContain('Current attempt'); expect(html).toContain('Last successful snapshot');
+    expect(html.match(/<h4>Changes<\/h4>/g)).toHaveLength(2);
+    expect(html.split('<details')[0]).not.toContain('class="sync-metric"');
+  });
+  it('shows a durable snapshot without an attempt, without inventing an estimate', () => {
+    const html = render(null);
+    expect(html).toContain('<dt>Pages scanned</dt>'); expect(html).toContain('<dt>Unique videos observed</dt>');
+    expect(html).not.toContain('Provider estimate'); expect(html).not.toContain('Current attempt');
+    expect(html.match(/<h4>Changes<\/h4>/g)).toHaveLength(1);
+  });
+  it('keeps active diagnostics and retry separate from previous results, with no attempt removals', () => {
+    const html = render(attempt({ retrying: true }));
+    expect(html).toContain('Current sync'); expect(html).toContain('Previous successful snapshot');
+    const current = html.split('Previous successful snapshot')[0]!;
+    expect(current).toContain('<dt>Pages processed</dt>'); expect(current).toContain('Retrying a temporary request');
+    expect(current).toContain('<dt>Checkpoint</dt>'); expect(current).not.toContain('<dt>Removed</dt>');
+    expect(html.match(/role="progressbar"/g)).toHaveLength(1);
+  });
+  it('keeps a later failure and its earlier finalized snapshot distinct', () => {
+    const html = render(attempt({ state: 'failure', attemptId: NEXT_ATTEMPT_ID, finishedAt: OBSERVED,
+      error: { category: 'network', messageKey: 'network-failed', phase: 'scanning' } }));
+    expect(html).toContain('role="status">Sync failed'); expect(html).toContain('role="alert"');
+    expect(html).toContain('Current attempt'); expect(html).toContain('Last successful snapshot');
+    expect(html).toContain('Last successful sync:'); expect(html).toContain('<dt>Finished</dt>');
+    expect(html.split('Last successful snapshot')[0]).not.toContain('<dt>Removed</dt>');
+  });
+  it('renders neutral no-success details without empty metric groups', () => {
+    const html = renderToStaticMarkup(<SyncStatus sync={null} />);
+    expect(html).toContain('data-tone="idle"'); expect(html).toContain('Never synced');
+    expect(html).toContain('No successful sync recorded.'); expect(html).not.toContain('<dl');
+  });
+  it('places availability context once in counts disclosure and keeps pagination free of counts', () => {
+    const html = renderToStaticMarkup(<LibraryBrowser observation={{ status: 'ready', snapshot: optionsSnapshot() }} />);
+    expect(html.match(/Availability reflects the last metadata check/g)).toHaveLength(1);
+    expect(html).toContain('62 available videos · 62 mirrored memberships');
+    const footer = html.split('class="results-footer"')[1]!.split('</nav>')[0]!;
+    expect(footer).toContain('Library pagination'); expect(footer).not.toContain('available videos'); expect(footer).not.toContain('mirrored memberships');
+    const detail = renderToStaticMarkup(<VideoDetail video={optionsVideos()[0]!} onBack={() => {}} />);
+    expect(detail).not.toContain('Availability'); expect(detail).not.toContain('availability-note');
+  });
+});
+
+describe('Handoff D+.1 quiet status fields', () => {
+  it('keeps mirror size and freshness in separate semantic elements outside the phase live region', () => {
+    const html = renderToStaticMarkup(<SyncStatus sync={optionsSnapshot().sync} />);
+    const primary = html.split('<details')[0]!;
+    expect(primary).toContain('<p class="sync-metric">2 mirrored</p>');
+    expect(primary).toContain('<p class="sync-updated muted">Updated <time');
+    expect(primary).toContain('role="status">Sync complete</p>');
+    expect(primary.match(/role="status"/g)).toHaveLength(1);
+    expect(primary).not.toMatch(/[·|]/); expect(primary).not.toContain('liked videos mirrored');
+  });
+  it('removes the account eyebrow and bordered Connected chip while retaining explicit trust text', () => {
+    const html = renderToStaticMarkup(<ConnectedAccount bootstrap={{ channelId: 'owner-a', channelTitle: 'My channel', likesPlaylistId: 'likes-owner-a' }} />);
+    const primary = html.split('</summary>')[0]!;
+    expect(primary).toContain('<span class="account-name">My channel</span>');
+    expect(primary).toContain('aria-label="Connection details for My channel"'); expect(primary).toContain('Connected to YouTube. Read-only access.');
+    expect(primary).toContain('<span class="status-chip">Read-only</span>');
+    expect(primary).not.toContain('YouTube account'); expect(primary).not.toContain('connected-chip');
+    expect(primary).not.toMatch(/[·|]/); expect(primary).not.toContain('role="status"');
+  });
+});
+
+describe('Handoff D+.2 header status disclosures', () => {
+  it('omits mirror diagnostics from the closed header while retaining structured exact counts', () => {
+    const html = renderToStaticMarkup(<SyncStatus sync={optionsSnapshot().sync} mode="header" />);
+    const trigger = html.split('</summary>')[0]!;
+    expect(trigger).toContain('aria-label="Sync details"'); expect(trigger).toContain('Sync complete');
+    expect(trigger).toContain('class="sync-updated muted">Updated <time');
+    expect(trigger).not.toContain('mirrored'); expect(trigger).not.toContain('sync-metric'); expect(trigger).not.toMatch(/[·|]/);
+    expect(html).toContain('<dt>Mirrored videos</dt><dd>2</dd>');
+    expect(html).toContain('<dt>Available videos</dt><dd>1</dd>');
+    expect(html.match(/role="status"/g)).toHaveLength(1);
+  });
+  it('keeps progress and exceptions below the header with one phase live region and one disclosure', () => {
+    const sync = { ...optionsSnapshot().sync!, currentAttempt: attempt({ retrying: true, rawItems: 100, estimatedTotal: 200 }) };
+    const header = renderToStaticMarkup(<SyncStatus sync={sync} mode="header" />);
+    const strip = renderToStaticMarkup(<SyncStatus sync={sync} mode="strip" />);
+    expect(header).toContain('Scanning liked videos'); expect(header).toContain('Retrying a temporary request');
+    expect(header).not.toContain('role="progressbar"'); expect(strip).toContain('aria-valuenow="50"');
+    expect(strip).not.toContain('<details'); expect(strip).not.toContain('role="status"');
+    expect(header.match(/role="status"/g)).toHaveLength(1);
+  });
+  it('keeps neutral never-synced header free of invented counts or freshness', () => {
+    const html = renderToStaticMarkup(<SyncStatus sync={null} mode="header" />);
+    expect(html).toContain('Never synced'); expect(html).toContain('No successful sync recorded.');
+    expect(html).not.toContain('<time'); expect(html).not.toContain('Mirrored videos');
   });
 });

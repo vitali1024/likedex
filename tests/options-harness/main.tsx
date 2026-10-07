@@ -15,7 +15,8 @@ export interface OptionsTestControl {
   calls: RuntimeOperation[];
   change(mode: string, count?: number): void;
   holdReads(operations?: RuntimeOperation[]): void;
-  releaseReads(): void;
+  releaseReads(operations?: RuntimeOperation[]): void;
+  renderedStates: { header: boolean; oldStatus: boolean; rows: boolean; checking: boolean; unavailable: boolean }[];
   pendingReads(): number;
   progress(page: number, phase: 'scanning' | 'applying'): void;
   checkpoint(values: Partial<SyncAttempt>): void;
@@ -27,16 +28,19 @@ const pickerVideos = channelPickerVideos();
 let revision = 1;
 const listeners = new Set<(event: unknown) => void>();
 const calls: RuntimeOperation[] = [];
-let pending: (() => void)[] = [];
+let pending: { operation: RuntimeOperation; resolve(): void }[] = [];
 let holding = new Set<RuntimeOperation>();
 const notify = () => listeners.forEach((listener) => listener({ protocolVersion: 1, event: 'STATE_REVISION',
   revision: snapshot.revision = ++revision, dataGeneration: snapshot.dataGeneration, authEpoch: snapshot.authEpoch }));
-const control: OptionsTestControl = { calls, change(next, count) {
+const renderedStates: OptionsTestControl['renderedStates'] = [];
+const control: OptionsTestControl = { calls, renderedStates, change(next, count) {
   mode = next;
   if (count !== undefined) snapshot = optionsSnapshot(count);
   notify();
-}, holdReads(operations = ['AUTH_STATUS_GET', 'LIBRARY_SNAPSHOT_GET']) { holding = new Set(operations); }, releaseReads() {
-  holding.clear(); const waiting = pending; pending = []; waiting.forEach((resolve) => resolve());
+}, holdReads(operations = ['AUTH_STATUS_GET', 'LIBRARY_SNAPSHOT_GET']) { holding = new Set(operations); }, releaseReads(operations) {
+  const released = operations ?? [...holding]; released.forEach((operation) => holding.delete(operation));
+  const waiting = pending.filter((item) => released.includes(item.operation));
+  pending = pending.filter((item) => !released.includes(item.operation)); waiting.forEach((item) => item.resolve());
 }, pendingReads() { return pending.length; }, progress(page, phase) {
   mode = 'progress';
   snapshot.sync!.currentAttempt = attempt({ attemptId: NEXT_ATTEMPT_ID, state: phase, pagesAccepted: page, rawItems: page * 50,
@@ -60,12 +64,13 @@ const control: OptionsTestControl = { calls, change(next, count) {
   if (broadcast) notify(); else snapshot.revision = ++revision;
 } };
 (window as unknown as { optionsTest: OptionsTestControl }).optionsTest = control;
+if (mode === 'bootstrap') control.holdReads();
 const client = new RuntimeClient({
   subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
   async send(request) {
     calls.push(request.operation);
     if (holding.has(request.operation)) {
-      await new Promise<void>((resolve) => pending.push(resolve));
+      await new Promise<void>((resolve) => pending.push({ operation: request.operation, resolve }));
     }
     const response = (result: unknown) => ({ protocolVersion: 1, requestId: request.requestId, operation: request.operation, ok: true, result });
     const rejected = (code: Parameters<typeof failure>[0], detail: Parameters<typeof failure>[1] = null) => ({ protocolVersion: 1,
@@ -86,6 +91,7 @@ const client = new RuntimeClient({
       if (mode === 'auth-error') return rejected('transport-error');
       const auth = optionsAuth();
       if (mode === 'unknown-title' && auth.status === 'authorized') delete auth.bootstrap.channelTitle;
+      if (mode === 'long-title' && auth.status === 'authorized') auth.bootstrap.channelTitle = `Very long channel ${'name '.repeat(35)}`;
       auth.control.revision = revision;
       auth.control.dataGeneration = snapshot.dataGeneration;
       auth.control.authEpoch = snapshot.authEpoch;
@@ -96,6 +102,10 @@ const client = new RuntimeClient({
       return response(auth);
     }
     if (request.operation === 'LIBRARY_SNAPSHOT_GET') {
+      if (mode === 'thumbnail-cases') return response({ ...snapshot, videos: snapshot.videos.map((video) => ({ ...video,
+        thumbnailUrl: `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`,
+        metadataFreshness: { ...video.metadataFreshness, thumbnailUrl: video.membershipFreshness },
+      })) });
       if (mode === 'channel-cases') return response({ ...snapshot, videos: pickerVideos });
       if (mode === 'snapshot-error') return rejected('storage-error');
       if (mode === 'mismatch') return rejected('auth-error', { category: 'owner-mismatch', messageKey: 'owner-mismatch', phase: 'preparing' });
@@ -111,4 +121,10 @@ const client = new RuntimeClient({
 });
 const root = document.getElementById('root');
 if (!root) throw new Error('Test composition root missing');
+new MutationObserver(() => {
+  const header = document.querySelector('.app-header');
+  renderedStates.push({ header: Boolean(header), oldStatus: Boolean(document.querySelector('.status-rail, .status-overview, main > .connection:not(:has([role="alert"]))')),
+    rows: Boolean(document.querySelector('.video-row')), checking: /Checking (connection|YouTube authorization)/.test(header?.textContent ?? ''),
+    unavailable: Boolean(document.querySelector('.empty.error')) });
+}).observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
 createRoot(root).render(<OptionsApp client={client} surface={new URL(location.href).searchParams.get('surface') === 'sidepanel' ? 'sidepanel' : 'options'} />);
