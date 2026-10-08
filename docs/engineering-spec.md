@@ -1,6 +1,6 @@
 # Likedex engineering specification
 
-Status: proposed implementation contracts, 2026-10-04. No implementation exists. The human-approved B-01 resolution is incorporated throughout: revoke/delete, bounded freshness and external-revocation cleanup are required. See [privacy and data](release/privacy-and-data.md#b-01-resolved-human-decision). B-01 is resolved; mechanisms below can be refined with evidence without weakening the approved postconditions.
+Status: approved engineering contracts, originally 2026-10-04; current implementation status checked 2026-10-08. Auth/provider/storage/sync/runtime, local queries, Full Library and Side Panel are implemented. Export/Clear/complete Disconnect UI and final release acceptance remain unfinished; see [actual verification](agentic/capstone-verification.md). The human-approved B-01 resolution requires revoke/delete, bounded freshness and external-revocation cleanup; see [privacy and data](release/privacy-and-data.md#b-01-resolved-human-decision). Mechanisms may be refined with evidence without weakening the approved postconditions. Requirements below are not proof that all acceptance gates passed.
 
 ## System and boundaries
 

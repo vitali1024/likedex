@@ -1,6 +1,6 @@
 # Likedex acceptance criteria
 
-Status: planned, not executed; B-01 resolved by human decision. IDs are stable and must be linked from future tests/reviews. U = unit/domain; P = provider contract; S = storage; R = runtime integration; E = real-extension automated; M = manual production/package; D = document/release evidence. Tests asserting preservation after ordinary sync failure seed an authorized, unexpired dataset. They do not prohibit separate Clear/Disconnect/authorization/expiry cleanup. No tests or release approval are claimed to have passed.
+Status: stable acceptance contract; implementation and deterministic checks exist, with [dated verification evidence](agentic/capstone-verification.md). Not every criterion has passed: data-control UI, independent high-risk review, exact-package real-account acceptance and public release gates remain unfinished. B-01 is resolved by human decision. U = unit/domain; P = provider contract; S = storage; R = runtime integration; E = real-extension automated; M = manual production/package; D = document/release evidence. Tests asserting preservation after ordinary sync failure seed an authorized, unexpired dataset. They do not prohibit separate Clear/Disconnect/authorization/expiry cleanup. A passing suite does not establish unperformed manual or external approvals.
 
 ## Authentication and ownership
 

@@ -1,6 +1,8 @@
 # Terminal Likes pagination compatibility correction
 
-**Current release status — 2026-10-04:** [live provider validation is COMPLETE / APPROVED](live-provider-validation.md). The human's corrected observation succeeded over 71 pages / 3,547 unique memberships; the final 47-item page retained resultsPerPage 50, had no continuation and hydrated 47/47, with trusted-complete, matching observed/expected/reported counts, zero invalid terminal items and internalStop none. **Production Sync gate: STILL CLOSED. First real synchronization smoke: NOT YET PERFORMED.** Approval authorizes a separate gate-enablement change. The failure analysis, maker checks and retry/build context below are historical; their pending statements are superseded by the completed record. No Phase 8 work is included.
+Current status, 2026-10-08: production Sync is enabled; the human-reported first real sync succeeded. See [live approval](live-provider-validation.md) and [current verification](../agentic/capstone-verification.md). The closed-gate and pending-smoke statements below belong to the earlier dated checkpoint.
+
+**Historical checkpoint before gate enablement — 2026-10-04:** [live provider validation is COMPLETE / APPROVED](live-provider-validation.md). The human's corrected observation succeeded over 71 pages / 3,547 unique memberships; the final 47-item page retained resultsPerPage 50, had no continuation and hydrated 47/47, with trusted-complete, matching observed/expected/reported counts, zero invalid terminal items and internalStop none. **Production Sync gate: STILL CLOSED. First real synchronization smoke: NOT YET PERFORMED.** Approval authorizes a separate gate-enablement change. The failure analysis, maker checks and retry/build context below are historical; their pending statements are superseded by the completed record. No Phase 8 work is included.
 
 ## Current proven terminal failure — 2026-10-04
 

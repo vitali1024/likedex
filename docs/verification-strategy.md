@@ -1,6 +1,6 @@
 # Likedex verification strategy
 
-Status: planned. No package scripts, tests, CI, passing results, or evidence logs exist in the specification phase. Acceptance IDs are defined in [acceptance criteria](acceptance-criteria.md).
+Status checked 2026-10-08: package scripts, tests, CI configuration and actual results exist; see [current and historical verification](agentic/capstone-verification.md). Acceptance IDs are defined in [acceptance criteria](acceptance-criteria.md). The table retains the full planned contract: `verify:data`, `verify:release` and `package:release` are not implemented commands. Existing build checks and WXT zip packaging do not complete the pending independent review or real-account release gates.
 
 ## Authoritative command
 
@@ -90,6 +90,6 @@ No sequence is performed now. Evidence links must point to actual commits and co
 
 ## Bounded loop and independent checker
 
-Phase 5's loop: implement approved slice → run verify:sync → inspect failure → correct → rerun. Stop on green. Allow at most **three unsuccessful correction iterations**, then stop, surface the failure and inspect the specification assumption; obtain human decision if necessary. Record initial run and each actual correction/command/result/decision when they happen under the future `docs/agentic/loops/` directory. There is no loop artifact in this phase.
+Phase 5's loop: implement approved slice → run verify:sync → inspect failure → correct → rerun. Stop on green. Allow at most **three unsuccessful correction iterations**, then stop, surface the failure and inspect the specification assumption; obtain human decision if necessary. The [actual sync loop](agentic/loops/sync-loop.md) preserves the executed iterations. Later loops must record only actual commands, outcomes and decisions.
 
-Phase 12 uses a fresh GPT-6 Astra High conversation, independent of the maker, reviewing a named commit. It must inspect pruning versus policy-deletion authority, transactions, worker recovery, ownership, revoke/deletion failures, external authorization loss, freshness provenance, wake-time gating and verification gaps, and run checks itself. Store genuine findings later under `docs/agentic/reviews/`. Maker fixes accepted issues with regressions and reruns verify; checker revisits high-risk fixes. Human deferrals cannot silently waive approved safety/retention requirements. B-01 is resolved in the specification, not evidence of passing implementation. No checker report exists now.
+Phase 12 uses a fresh GPT-6 Astra High conversation, independent of the maker, reviewing a named commit. It must inspect pruning versus policy-deletion authority, transactions, worker recovery, ownership, revoke/deletion failures, external authorization loss, freshness provenance, wake-time gating and verification gaps, and run checks itself. Store genuine findings later under `docs/agentic/reviews/`. Maker fixes accepted issues with regressions and reruns verify; checker revisits high-risk fixes. Human deferrals cannot silently waive approved safety/retention requirements. B-01 is resolved in the specification, not evidence of passing implementation. The separate [human-reported ChatGPT Web checker workflow](agentic/independent-checker-review.md) documents a UI correction retrospectively; it does not complete this high-risk review.

@@ -1,5 +1,7 @@
 # Phase 6 runtime messaging and MV3 lifecycle
 
+Historical phase/handoff record: its baseline, then-pending work and staging statements describe that execution. The working implementation and subsequent committed enablement/UI changes are current; [final verification](agentic/capstone-verification.md) records source/package provenance and remaining release gates. Production Sync is enabled; first real sync is human-reported. Independent high-risk and human exact-package/native-toolbar acceptance remain pending.
+
 Implemented on clean baseline `a70f972`, following Phase 5 and the human-approved fail-closed provider amendment. This is maker implementation and deterministic/browser verification, not independent review, live OAuth/provider evidence or release acceptance. Changes remain unstaged/uncommitted. Phase 7 has not begun.
 
 ## Changed files

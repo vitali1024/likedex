@@ -1,5 +1,6 @@
 # Options and Side Panel library UI
 
+Current verification, 2026-10-08: Reset View correction `d237bbf`; subsequent focused filter-font correction `347cb3e`. Existing responsive assertions remain intact. See [final source, CI and package provenance](agentic/capstone-verification.md). Earlier presentation checkpoints below retain their dates.
 ## Current presentation, amended 2026-10-07
 
 ### Canonical compact status controls on both surfaces, 2026-10-07

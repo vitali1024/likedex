@@ -1,6 +1,6 @@
 # Likedex product specification
 
-Status: specification for human review, 2026-10-04, incorporating the human-approved B-01 resolution. Choices are recorded in [decisions](decisions.md); testable gates are in [acceptance criteria](acceptance-criteria.md). The [data inventory](release/privacy-and-data.md#b-01-resolved-human-decision) defines bounded retention and deletion on revocation. B-01 is resolved; implementation and release verification remain future work.
+Status: approved product contract, originally 2026-10-04; current implementation status checked 2026-10-08. Local browsing, Connect and approved production Sync are implemented. Export Data, Clear Local Data and complete Disconnect/Revoke UI remain unfinished; public release acceptance is pending. Choices are recorded in [decisions](decisions.md), gates in [acceptance criteria](acceptance-criteria.md), and actual results in [capstone verification](agentic/capstone-verification.md). The [data inventory](release/privacy-and-data.md#b-01-resolved-human-decision) defines the resolved B-01 retention/deletion contract. Requirements below are not completion claims.
 
 ## Problem, user, and value
 

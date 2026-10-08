@@ -1,5 +1,7 @@
 # Phase 3 authentication and remote identity foundation
 
+Historical phase/handoff record: its baseline, then-pending work and staging statements describe that execution. The working implementation and subsequent committed enablement/UI changes are current; [final verification](agentic/capstone-verification.md) records source/package provenance and remaining release gates. Production Sync is enabled; first real sync is human-reported. Independent high-risk and human exact-package/native-toolbar acceptance remain pending.
+
 Implemented against specification boundary commit `754fc50`. This is an adapter/service foundation with deterministic fake-boundary tests; it does not establish live production OAuth, synchronization, runtime, UI, or release acceptance. Independent auth/storage review remains required before release.
 
 ## Configuration and composition

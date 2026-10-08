@@ -1,5 +1,7 @@
 # Toolbar launcher handoff A
 
+Historical phase/handoff record: its baseline, then-pending work and staging statements describe that execution. The working implementation and subsequent committed enablement/UI changes are current; [final verification](agentic/capstone-verification.md) records source/package provenance and remaining release gates. Production Sync is enabled; first real sync is human-reported. Independent high-risk and human exact-package/native-toolbar acceptance remain pending.
+
 Implemented as an unstaged shell/branding patch on 2026-10-06. Human native-toolbar/visual smoke remains required; this is not Store release acceptance.
 
 ## Starting state

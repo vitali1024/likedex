@@ -1,6 +1,6 @@
 # Likedex privacy and data inventory
 
-Status: engineering foundation, 2026-10-04; planned behavior, not a published privacy policy or legal advice. No implementation or external submission exists. Public disclosures must be checked against actual code, network behavior, and applicable provider requirements before release.
+Status checked 2026-10-08: implementation exists and a voluntary tester preview is being finalized. This is an engineering inventory and required data contract, not a published privacy policy or a compliance approval. Connect, Sync and local browsing are implemented; Export/Clear/complete Disconnect UI are unfinished. Store review submission, public OAuth verification and independent high-risk release acceptance remain pending. Public disclosures must match actual code, observed network behavior and applicable provider requirements before release.
 
 ## B-01: resolved human decision
 
@@ -42,6 +42,8 @@ Final image/connect allowlists must be derived from real API responses and recor
 No analytics, telemetry, advertising, backend dataset storage, sale, or sharing for unrelated purposes. Mirrored records stay in the extension's local IndexedDB unless the user exports them. Authentication/sync/resource requests still communicate with Google/YouTube; therefore “nothing leaves the device” is not a valid claim. Review both dependency graph and observed network traffic to substantiate disclosures.
 
 ## User controls and retention
+
+The Export, Clear and Disconnect bullets below describe required final controls. They are not user-available controls in tester preview 0.1.0. Service-level cleanup/fencing foundations and deterministic expiry checks do not establish completion of those UI flows; see [tester limitations and separate revoke instructions](tester-installation.md).
 
 - **Export:** explicit user-initiated versioned JSON copy of eligible local data with owner, mirrored fields, last success and freshness/snapshot provenance. No credentials/tokens/browser internals/secrets. Expired or cleanup-pending data cannot be exported; an empty post-cleanup dataset is valid. Likedex cannot remotely erase the downloaded file. Import is excluded.
 - **Clear Local Data:** immediate confirmed transaction removes mirrored/owner/sync/reconciliation/preference data; minimal nonsecret connection/fencing state remains. Does not revoke Google consent. Clears selections on both surfaces; no automatic resync.

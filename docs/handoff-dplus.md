@@ -1,5 +1,6 @@
 # Handoff D+.2 corrective maker report — 2026-10-07
 
+Historical D+/D+.1/D+.2 report. The 687/77 checkpoint and then-uncommitted status below are preserved with their dates; [current verification](agentic/capstone-verification.md) records the later 694/81 inventory and published corrective commits. Human exact-package/native toolbar acceptance remains pending.
 Header integration and the focused runtime correction build on the uncommitted D+/D+.1 tree. Human exact-package/native Side Panel smoke remains **unpassed**. This is maker implementation/evidence, not release completion or independent review. Previous D+ (677/101/73) and D+.1 (679/103/75) results are preserved verbatim below.
 
 ## D+.2 starting state

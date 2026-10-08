@@ -1,0 +1,216 @@
+Actual complete local run. Started 2026-10-08T07:30:42.6856923+03:00. Windows; Node 24.19.0; npm 11.17.0; WXT 0.21.4. Exit 0. Checked working tree subsequently committed as d237bbf19995f52049e41af078f0c35b11db6c7b; only documentation changed afterward. ANSI terminal controls removed.
+
+
+> likedex@0.1.0 verify
+> npm run lint && npm run typecheck && npm run test && npm run build && npm run check:build && npm run build:provider-validation && npm run check:provider-validation && npm run test:e2e
+
+
+> likedex@0.1.0 lint
+> eslint . --max-warnings=0
+
+
+> likedex@0.1.0 typecheck
+> wxt prepare && tsc --noEmit
+
+
+WXT 0.21.4
+i Generating types...
+√ Finished in 255 ms
+
+> likedex@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.3 C:/Dev/likedex
+
+
+ Test Files  16 passed (16)
+      Tests  694 passed (694)
+   Start at  07:31:27
+   Duration  4.85s (import 56%, tests 32%, transform 11%, worker 1%)
+
+
+> likedex@0.1.0 build
+> wxt build -b chrome --mv3
+
+
+WXT 0.21.4
+i Building chrome-mv3 for production with Vite 8.3.2
+
+⠋ Preparing...
+⠋ [1/2] background
+⠙ [1/2] background
+⠙ [2/2] options, popup, sidepanel
+⠹ [2/2] options, popup, sidepanel
+⠸ [2/2] options, popup, sidepanel
+⠼ [2/2] options, popup, sidepanel
+⠴ [2/2] options, popup, sidepanel
+⠦ [2/2] options, popup, sidepanel
+
+√ Built extension in 728 ms
+  ├─ .output\chrome-mv3\manifest.json                           1.47 kB  
+  ├─ .output\chrome-mv3\options.html                            616 B    
+  ├─ .output\chrome-mv3\popup.html                              473 B    
+  ├─ .output\chrome-mv3\sidepanel.html                          567 B    
+  ├─ .output\chrome-mv3\background.js                           252.21 kB
+  ├─ .output\chrome-mv3\chunks\BrandMark-B--_eGWY.js            219.74 kB
+  ├─ .output\chrome-mv3\chunks\options-9_9pDra1.js              156.87 kB
+  ├─ .output\chrome-mv3\chunks\options-CDh9_G8k.js              320 B    
+  ├─ .output\chrome-mv3\chunks\popup-CF7QVjhR.js                4.98 kB  
+  ├─ .output\chrome-mv3\chunks\sidepanel-BzfKSQX7.js            343 B    
+  ├─ .output\chrome-mv3\assets\options-yrJpzeOE.css             28.30 kB 
+  ├─ .output\chrome-mv3\assets\popup-CWqPUmHk.css               1.75 kB  
+  ├─ .output\chrome-mv3\action\16.png                           629 B    
+  ├─ .output\chrome-mv3\action\24.png                           1.06 kB  
+  ├─ .output\chrome-mv3\action\32.png                           1.55 kB  
+  ├─ .output\chrome-mv3\brand\likedex-mark-vector.svg           25.16 kB 
+  ├─ .output\chrome-mv3\icon\128.png                            10.11 kB 
+  ├─ .output\chrome-mv3\icon\16.png                             629 B    
+  ├─ .output\chrome-mv3\icon\32.png                             1.55 kB  
+  ├─ .output\chrome-mv3\icon\48.png                             2.53 kB  
+  ├─ .output\chrome-mv3\launcher\likedex-open-full-library.png  681.90 kB
+  └─ .output\chrome-mv3\launcher\likedex-open-side-panel.png    609.90 kB
+Σ Total size: 2.00 MB                                         
+√ Finished in 937 ms
+
+> likedex@0.1.0 check:build
+> node scripts/check-build.mjs
+
+Approved production Sync gate, OAuth/Store identity, launcher isolation, Chrome 141, manifest, canonical hashes and production artifact checks passed.
+
+> likedex@0.1.0 build:provider-validation
+> wxt build -c wxt.validation.config.ts -b chrome --mv3
+
+
+WXT 0.21.4
+i Building chrome-mv3 for production with Vite 8.3.2
+
+⠋ Preparing...
+⠋ [1/2] background
+⠙ [1/2] background
+⠙ [2/2] options, provider-validation, sidepanel
+⠹ [2/2] options, provider-validation, sidepanel
+⠸ [2/2] options, provider-validation, sidepanel
+
+√ Built extension in 357 ms
+  ├─ .output\provider-validation\chrome-mv3\manifest.json                                 1.47 kB  
+  ├─ .output\provider-validation\chrome-mv3\options.html                                  600 B    
+  ├─ .output\provider-validation\chrome-mv3\provider-validation.html                      564 B    
+  ├─ .output\provider-validation\chrome-mv3\sidepanel.html                                338 B    
+  ├─ .output\provider-validation\chrome-mv3\background.js                                 259.92 kB
+  ├─ .output\provider-validation\chrome-mv3\chunks\_virtual_wxt-html-plugins-P2Xu9kJm.js  670 B    
+  ├─ .output\provider-validation\chrome-mv3\chunks\options-4yF6kzCg.js                    313.14 kB
+  ├─ .output\provider-validation\chrome-mv3\chunks\options-DIAAtwDQ.js                    65.17 kB 
+  ├─ .output\provider-validation\chrome-mv3\chunks\provider-validation--Fka5UNo.js        7.63 kB  
+  ├─ .output\provider-validation\chrome-mv3\assets\options-yrJpzeOE.css                   28.30 kB 
+  ├─ .output\provider-validation\chrome-mv3\action\16.png                                 629 B    
+  ├─ .output\provider-validation\chrome-mv3\action\24.png                                 1.06 kB  
+  ├─ .output\provider-validation\chrome-mv3\action\32.png                                 1.55 kB  
+  ├─ .output\provider-validation\chrome-mv3\brand\likedex-mark-vector.svg                 25.16 kB 
+  ├─ .output\provider-validation\chrome-mv3\icon\128.png                                  10.11 kB 
+  ├─ .output\provider-validation\chrome-mv3\icon\16.png                                   629 B    
+  ├─ .output\provider-validation\chrome-mv3\icon\32.png                                   1.55 kB  
+  ├─ .output\provider-validation\chrome-mv3\icon\48.png                                   2.53 kB  
+  ├─ .output\provider-validation\chrome-mv3\launcher\likedex-open-full-library.png        681.90 kB
+  └─ .output\provider-validation\chrome-mv3\launcher\likedex-open-side-panel.png          609.90 kB
+Σ Total size: 2.01 MB                                                                   
+√ Finished in 650 ms
+
+> likedex@0.1.0 check:provider-validation
+> node scripts/check-provider-validation-build.mjs
+
+Separate validation package, unchanged production identity/permissions and fixture/secret exclusion passed.
+
+> likedex@0.1.0 test:e2e
+> playwright test
+
+
+Running 81 tests using 1 worker
+
+(node:18804) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 tests\e2e\launcher.spec.ts:61:1 › real production launcher mounts with exactly two destinations and native Full Library opens (418ms)
+  ok  2 tests\e2e\launcher.spec.ts:82:1 › real Chrome Open/Close, reopening and two-window state work without a stored toggle (1.2s)
+  ok  3 tests\e2e\launcher.spec.ts:114:1 › current-window closed → open → close uses scoped APIs and fresh browser queries (159ms)
+  ok  4 tests\e2e\launcher.spec.ts:129:1 › another-window Side Panel does not set Close in this window (104ms)
+  ok  5 tests\e2e\launcher.spec.ts:135:1 › query failure leaves a mounted truthful launcher and independent Full Library (146ms)
+  ok  6 tests\e2e\launcher.spec.ts:145:64 › open-failure preserves label, sanitizes error and permits retry (178ms)
+  ok  7 tests\e2e\launcher.spec.ts:145:64 › close-failure preserves label, sanitizes error and permits retry (185ms)
+  ok  8 tests\e2e\launcher.spec.ts:156:1 › keyboard order, visible focus, native buttons, and border-free image slots (216ms)
+  ok  9 tests\e2e\launcher.spec.ts:175:1 › unresolved state is disabled/busy and Full Library stays available (148ms)
+  ok 10 tests\e2e\options.spec.ts:50:3 › options: icon controls retain keyboard details, real status visuals and the separate Sync action (1.1s)
+  ok 11 tests\e2e\options.spec.ts:50:3 › sidepanel: icon controls retain keyboard details, real status visuals and the separate Sync action (1.0s)
+  ok 12 tests\e2e\options.spec.ts:105:3 › options: D+.2 true document remount uses coherent header architecture from first paint (1.6s)
+  ok 13 tests\e2e\options.spec.ts:141:3 › options: approved status header geometry, semantic fields and stable disclosures (3.3s)
+  ok 14 tests\e2e\options.spec.ts:224:3 › options: D+.2 header clusters, coherent success details, counts and centered pagination (1.2s)
+  ok 15 tests\e2e\options.spec.ts:269:3 › options: D+ primary focus uses one card frame and secondary actions keep their own focus (932ms)
+  ok 16 tests\e2e\options.spec.ts:300:3 › options: D+ thumbnail stays centered, 16:9 and contained at every supported width (1.0s)
+  ok 17 tests\e2e\options.spec.ts:339:3 › options: D+ long channel title and status disclosures wrap without overflow (1.3s)
+  ok 18 tests\e2e\options.spec.ts:105:3 › sidepanel: D+.2 true document remount uses coherent header architecture from first paint (1.7s)
+  ok 19 tests\e2e\options.spec.ts:141:3 › sidepanel: approved status header geometry, semantic fields and stable disclosures (1.9s)
+  ok 20 tests\e2e\options.spec.ts:224:3 › sidepanel: D+.2 header clusters, coherent success details, counts and centered pagination (756ms)
+  ok 21 tests\e2e\options.spec.ts:269:3 › sidepanel: D+ primary focus uses one card frame and secondary actions keep their own focus (575ms)
+  ok 22 tests\e2e\options.spec.ts:300:3 › sidepanel: D+ thumbnail stays centered, 16:9 and contained at every supported width (811ms)
+  ok 23 tests\e2e\options.spec.ts:339:3 › sidepanel: D+ long channel title and status disclosures wrap without overflow (857ms)
+  ok 24 tests\e2e\options.spec.ts:369:3 › options: authoritative progress stays mounted across phases and settles into compact success (742ms)
+  ok 25 tests\e2e\options.spec.ts:414:3 › options: unknown total, partial failure, and account details retain truth (543ms)
+  ok 26 tests\e2e\options.spec.ts:456:3 › options: badge fits low, middle and high checkpoints with reduced motion (1.4s)
+  ok 27 tests\e2e\options.spec.ts:369:3 › sidepanel: authoritative progress stays mounted across phases and settles into compact success (800ms)
+  ok 28 tests\e2e\options.spec.ts:414:3 › sidepanel: unknown total, partial failure, and account details retain truth (568ms)
+  ok 29 tests\e2e\options.spec.ts:456:3 › sidepanel: badge fits low, middle and high checkpoints with reduced motion (1.4s)
+  ok 30 tests\e2e\options.spec.ts:505:3 › options: channel and date drafts preserve results until one Apply (1.6s)
+  ok 31 tests\e2e\options.spec.ts:550:3 › options: Escape, outside and trigger closing discard drafts and local channel search (1.3s)
+  ok 32 tests\e2e\options.spec.ts:576:3 › options: channel Clear and panel Clear filters edit only the draft (774ms)
+  ok 33 tests\e2e\options.spec.ts:603:3 › options: sibling popups close and Escape dismisses the deepest menu (619ms)
+  ok 34 tests\e2e\options.spec.ts:626:3 › options: fixed filter geometry, bounded scrolling and date validation fit supported widths (3.0s)
+  ok 35 tests\e2e\options.spec.ts:674:3 › options: unavailability removes draft controls and fresh eligibility starts clean (518ms)
+  ok 36 tests\e2e\options.spec.ts:686:3 › options: Back preserves browsing state and library Reset view restores defaults (2.2s)
+  ok 37 tests\e2e\options.spec.ts:737:3 › options: responsive detail keeps library Reset only in split layout with no duplicate row (766ms)
+  ok 38 tests\e2e\options.spec.ts:779:5 › options: themed Duration supports keyboard choice, selection, dismissal and Tab exit (732ms)
+  ok 39 tests\e2e\options.spec.ts:779:5 › options: themed Sort supports keyboard choice, selection, dismissal and Tab exit (694ms)
+  ok 40 tests\e2e\options.spec.ts:779:5 › options: themed Date basis supports keyboard choice, selection, dismissal and Tab exit (771ms)
+  ok 41 tests\e2e\options.spec.ts:505:3 › sidepanel: channel and date drafts preserve results until one Apply (1.6s)
+  ok 42 tests\e2e\options.spec.ts:550:3 › sidepanel: Escape, outside and trigger closing discard drafts and local channel search (1.3s)
+  ok 43 tests\e2e\options.spec.ts:576:3 › sidepanel: channel Clear and panel Clear filters edit only the draft (770ms)
+  ok 44 tests\e2e\options.spec.ts:603:3 › sidepanel: sibling popups close and Escape dismisses the deepest menu (655ms)
+  ok 45 tests\e2e\options.spec.ts:626:3 › sidepanel: fixed filter geometry, bounded scrolling and date validation fit supported widths (2.7s)
+  ok 46 tests\e2e\options.spec.ts:674:3 › sidepanel: unavailability removes draft controls and fresh eligibility starts clean (415ms)
+  ok 47 tests\e2e\options.spec.ts:686:3 › sidepanel: Back preserves browsing state and library Reset view restores defaults (2.5s)
+  ok 48 tests\e2e\options.spec.ts:737:3 › sidepanel: responsive detail keeps library Reset only in split layout with no duplicate row (635ms)
+  ok 49 tests\e2e\options.spec.ts:779:5 › sidepanel: themed Duration supports keyboard choice, selection, dismissal and Tab exit (746ms)
+  ok 50 tests\e2e\options.spec.ts:779:5 › sidepanel: themed Sort supports keyboard choice, selection, dismissal and Tab exit (770ms)
+  ok 51 tests\e2e\options.spec.ts:779:5 › sidepanel: themed Date basis supports keyboard choice, selection, dismissal and Tab exit (825ms)
+  ok 52 tests\e2e\options.spec.ts:810:1 › first run requires privacy agreement and explicit Connect; pending, denial and retry are truthful (609ms)
+  ok 53 tests\e2e\options.spec.ts:827:1 › local search/filter/sort/page/selection and canonical links; production auth precondition preserves library (2.2s)
+  ok 54 tests\e2e\options.spec.ts:875:1 › keyboard shortcut, narrow focused detail/Back, page context and no horizontal clipping (680ms)
+  ok 55 tests\e2e\options.spec.ts:905:1 › runtime failure, owner mismatch, active sync and later failure never masquerade as idle or empty (283ms)
+  ok 56 tests\e2e\options.spec.ts:925:1 › expiry with a missed notification discards cached detail and rows before reuse (1.3s)
+  ok 57 tests\e2e\options.spec.ts:935:1 › agreement storage failure stays visible and never invokes Connect (145ms)
+  ok 58 tests\e2e\options.spec.ts:946:1 › row actions, arrow selection and filter dismissal preserve local query context (1.5s)
+  ok 59 tests\e2e\options.spec.ts:978:1 › privacy dialog traps focus, dismisses with Escape and restores the invoking control (968ms)
+  ok 60 tests\e2e\options.spec.ts:993:1 › Side Panel expands one row and detail Back restores page, query, scroll and focus (699ms)
+  ok 61 tests\e2e\options.spec.ts:1029:1 › 3547-record library stays page bounded and local while selection and filters change (640ms)
+  ok 62 tests\e2e\options.spec.ts:1045:1 › consecutive page revision bursts keep identity, progress and local browsing usable in flight (1.9s)
+  ok 63 tests\e2e\options.spec.ts:1096:3 › generation revision immediately clears library and auth identity while refresh is held (314ms)
+  ok 64 tests\e2e\options.spec.ts:1096:3 › epoch revision immediately clears library and auth identity while refresh is held (337ms)
+  ok 65 tests\e2e\options.spec.ts:1117:1 › hidden active surface retains eligible rows, pauses polling and catches up once on visibility plus focus (310ms)
+  ok 66 tests\e2e\options.spec.ts:1177:3 › options: five eligible hide/show cycles retain rows, account, Sync and browsing state with zero reads (919ms)
+  ok 67 tests\e2e\options.spec.ts:1218:3 › options: hidden active Sync with no revision uses one snapshot catch-up and zero auth reads (260ms)
+  ok 68 tests\e2e\options.spec.ts:1233:3 › options: hidden expiry removes all row/link actions before visible reuse (1.1s)
+  ok 69 tests\e2e\options.spec.ts:1250:5 › options: hidden generation invalidation never revives old rows or identity (185ms)
+  ok 70 tests\e2e\options.spec.ts:1250:5 › options: hidden epoch invalidation never revives old rows or identity (185ms)
+  ok 71 tests\e2e\options.spec.ts:1177:3 › sidepanel: five eligible hide/show cycles retain rows, account, Sync and browsing state with zero reads (962ms)
+  ok 72 tests\e2e\options.spec.ts:1218:3 › sidepanel: hidden active Sync with no revision uses one snapshot catch-up and zero auth reads (260ms)
+  ok 73 tests\e2e\options.spec.ts:1233:3 › sidepanel: hidden expiry removes all row/link actions before visible reuse (1.1s)
+  ok 74 tests\e2e\options.spec.ts:1250:5 › sidepanel: hidden generation invalidation never revives old rows or identity (210ms)
+  ok 75 tests\e2e\options.spec.ts:1250:5 › sidepanel: hidden epoch invalidation never revives old rows or identity (193ms)
+Foreground API visibility states: visible, visible, visible, visible, visible, visible, visible, visible, visible, visible
+  ok 76 tests\e2e\options.spec.ts:1270:1 › Full Library and companion surface retain independent views across browser foreground changes (1.0s)
+  ok 77 tests\e2e\options.spec.ts:1294:1 › explicit refresh auth fences a cached library on a dropped context broadcast and late library response (270ms)
+  ok 78 tests\e2e\options.spec.ts:1310:1 › same-context passive auth pending retains eligible identity, but an actual auth failure fences a delayed library reply (247ms)
+  ok 79 tests\e2e\provider-validation.spec.ts:9:1 › Options Connect uses native worker fetch with its required receiver (1.6s)
+  ok 80 tests\e2e\provider-validation.spec.ts:65:1 › separate validation package uses Options Connect, observes without writes, and keeps production Sync closed (1.6s)
+Loaded production extension ID: mmefiakgfhddiojfdnkfpfpbkgbfgkgj
+  ok 81 tests\e2e\shell.spec.ts:8:1 › Production extension loads shells, typed runtime, approved gate and restarted worker (1.5s)
+
+  81 passed (1.3m)

@@ -4,7 +4,7 @@
 
 - Name: **Likedex**; internal identifier/database: `likedex`; environment prefix: `LIKEDEX_`.
 - YouTube Liked Videos only; local-first browsing; read-only YouTube access.
-- This repository currently contains specifications only. Human review and a specification/context commit must precede scaffolding or implementation. Do not stage or commit without authorization.
+- Specifications were committed before scaffolding; the repository now contains a working capstone implementation. Keep later work within the approved phase/scope and do not stage or commit without authorization.
 - Read [product](docs/product-spec.md), [engineering](docs/engineering-spec.md), [acceptance](docs/acceptance-criteria.md), and the current [plan](docs/implementation-plan.md) before coding.
 
 ## Critical invariants
@@ -26,7 +26,7 @@
 ## Quality and workflow
 
 - Inspect before editing; use strict TypeScript and runtime validation of external data.
-- Run the smallest relevant verification first; future phase completion requires `npm run verify`. Commands do not exist during this specification phase.
+- Run the smallest relevant verification first; phase completion requires the implemented `npm run verify`. Planned data/release commands remain unavailable until implemented; never cite them as executed checks.
 - Sync/auth/storage work requires a fresh independent review before release. Do not fabricate tests, loop logs, reviews, approvals, or evidence.
 - For the sync loop: at most three unsuccessful correction iterations, then stop and surface the blocker. Never weaken the pruning gate to make tests pass.
 - If implementation disproves an architectural/product assumption, stop affected work, explain the evidence, amend the spec/decision with human approval where required, commit the amendment when authorized, then continue.

@@ -1,5 +1,7 @@
 # Phase 4 YouTube Liked Videos provider ingestion
 
+Historical phase/handoff record: its baseline, then-pending work and staging statements describe that execution. The working implementation and subsequent committed enablement/UI changes are current; [final verification](agentic/capstone-verification.md) records source/package provenance and remaining release gates. Production Sync is enabled; first real sync is human-reported. Independent high-risk and human exact-package/native-toolbar acceptance remain pending.
+
 This implements ingestion against the committed specifications and Phase 3 bootstrap/request foundation. It creates in-memory domain records and provider evidence only. Synchronization, repository application, owner binding, finalization/pruning, durable attempt state, runtime routing and product UI remain later work. There is no automatic invocation from extension entrypoints. Maker verification is not independent review or live-account evidence.
 
 ## Requests and authentication boundary

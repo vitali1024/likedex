@@ -4,6 +4,8 @@ Status: Phase 3 service/configuration foundation, 2026-10-04. The human supplied
 
 ## Human-supplied public production configuration
 
+Current audience, confirmed by the human on 2026-10-08: **Testing** for `likedex-extension-prod`. Volunteers must privately arrange test-user access with the owner before Connect; no tester addresses are published. Public OAuth verification is not confirmed complete. Testing authorization has a limited lifetime; see [Google's audience guidance](https://support.google.com/cloud/answer/15549945?hl=en). This audience is separate from Chrome Web Store trusted testers. No external console change was performed by this finalization task.
+
 | Field | Value |
 |---|---|
 | Google Cloud project ID | `likedex-extension-prod` |
@@ -49,7 +51,7 @@ Google's [verification guidance](https://developers.google.com/identity/protocol
 
 ## Production account smoke and revoke verification
 
-**Live provider validation: COMPLETE / APPROVED. Production Sync gate: STILL CLOSED. First real synchronization smoke: NOT YET PERFORMED.** The human reported successful authorized bootstrap (`bootstrapValidated: true`) and full provider observation through the real production extension/OAuth identity in the dedicated validation build. See the [sanitized evidence and human acceptance](live-provider-validation.md). Fresh-consent versus cached-grant behavior and the broader Connect/revoke/delete/expiry checks below were not supplied as completed evidence. Approval authorizes a separate gate-enablement change; it does not itself enable Sync, establish public access readiness or satisfy the final exact-package smoke. No Phase 8 work is included.
+**Historical checkpoint before gate enablement:** live provider validation was COMPLETE / APPROVED while production Sync was STILL CLOSED and first real sync had not yet occurred. Current production Sync is ENABLED and the first successful sync is [human-reported](../agentic/capstone-verification.md#human-reported-live-results). The human reported successful authorized bootstrap (`bootstrapValidated: true`) and full provider observation through the real production extension/OAuth identity in the dedicated validation build. See the [sanitized evidence and human acceptance](live-provider-validation.md). Fresh-consent versus cached-grant behavior and the broader Connect/revoke/delete/expiry checks below were not supplied as completed evidence. Approval authorizes a separate gate-enablement change; it does not itself enable Sync, establish public access readiness or satisfy the final exact-package smoke. No Phase 8 work is included.
 
 Human runs with the production-like exact package and stable ID:
 

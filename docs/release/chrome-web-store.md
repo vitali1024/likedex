@@ -4,6 +4,8 @@ Status: Store draft identity reserved by the human owner, 2026-10-04. Product re
 
 ## Reserved Chrome Web Store identity
 
+Current capstone checkpoint, 2026-10-08: [tester prerelease](https://github.com/vitali1024/likedex/releases/tag/capstone-preview-2026-10-08-2) distributes standalone unpacked version **0.1.0**, from verified source `347cb3e52ba5ef6c71759b61c6be3f56d1d4e4ca`. This task uploads nothing to the Store. Last confirmed Store state remains **Draft**; no review/submission/publication receipt is claimed. [Tester instructions](tester-installation.md) distinguish OAuth Testing access, unfinished controls and pending real-account exact-package/high-risk acceptance.
+
 - Product: **Likedex**
 - Store Item ID: `mmefiakgfhddiojfdnkfpfpbkgbfgkgj`
 - Reservation package: **0.1.0**
