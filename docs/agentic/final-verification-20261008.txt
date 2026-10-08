@@ -48,29 +48,29 @@ i Building chrome-mv3 for production with Vite 8.3.2
 ⠦ [2/2] options, popup, sidepanel
 
 √ Built extension in 728 ms
-  ├─ .output\chrome-mv3\manifest.json                           1.47 kB  
-  ├─ .output\chrome-mv3\options.html                            616 B    
-  ├─ .output\chrome-mv3\popup.html                              473 B    
-  ├─ .output\chrome-mv3\sidepanel.html                          567 B    
+  ├─ .output\chrome-mv3\manifest.json                           1.47 kB
+  ├─ .output\chrome-mv3\options.html                            616 B
+  ├─ .output\chrome-mv3\popup.html                              473 B
+  ├─ .output\chrome-mv3\sidepanel.html                          567 B
   ├─ .output\chrome-mv3\background.js                           252.21 kB
   ├─ .output\chrome-mv3\chunks\BrandMark-B--_eGWY.js            219.74 kB
   ├─ .output\chrome-mv3\chunks\options-9_9pDra1.js              156.87 kB
-  ├─ .output\chrome-mv3\chunks\options-CDh9_G8k.js              320 B    
-  ├─ .output\chrome-mv3\chunks\popup-CF7QVjhR.js                4.98 kB  
-  ├─ .output\chrome-mv3\chunks\sidepanel-BzfKSQX7.js            343 B    
-  ├─ .output\chrome-mv3\assets\options-yrJpzeOE.css             28.30 kB 
-  ├─ .output\chrome-mv3\assets\popup-CWqPUmHk.css               1.75 kB  
-  ├─ .output\chrome-mv3\action\16.png                           629 B    
-  ├─ .output\chrome-mv3\action\24.png                           1.06 kB  
-  ├─ .output\chrome-mv3\action\32.png                           1.55 kB  
-  ├─ .output\chrome-mv3\brand\likedex-mark-vector.svg           25.16 kB 
-  ├─ .output\chrome-mv3\icon\128.png                            10.11 kB 
-  ├─ .output\chrome-mv3\icon\16.png                             629 B    
-  ├─ .output\chrome-mv3\icon\32.png                             1.55 kB  
-  ├─ .output\chrome-mv3\icon\48.png                             2.53 kB  
+  ├─ .output\chrome-mv3\chunks\options-CDh9_G8k.js              320 B
+  ├─ .output\chrome-mv3\chunks\popup-CF7QVjhR.js                4.98 kB
+  ├─ .output\chrome-mv3\chunks\sidepanel-BzfKSQX7.js            343 B
+  ├─ .output\chrome-mv3\assets\options-yrJpzeOE.css             28.30 kB
+  ├─ .output\chrome-mv3\assets\popup-CWqPUmHk.css               1.75 kB
+  ├─ .output\chrome-mv3\action\16.png                           629 B
+  ├─ .output\chrome-mv3\action\24.png                           1.06 kB
+  ├─ .output\chrome-mv3\action\32.png                           1.55 kB
+  ├─ .output\chrome-mv3\brand\likedex-mark-vector.svg           25.16 kB
+  ├─ .output\chrome-mv3\icon\128.png                            10.11 kB
+  ├─ .output\chrome-mv3\icon\16.png                             629 B
+  ├─ .output\chrome-mv3\icon\32.png                             1.55 kB
+  ├─ .output\chrome-mv3\icon\48.png                             2.53 kB
   ├─ .output\chrome-mv3\launcher\likedex-open-full-library.png  681.90 kB
   └─ .output\chrome-mv3\launcher\likedex-open-side-panel.png    609.90 kB
-Σ Total size: 2.00 MB                                         
+Σ Total size: 2.00 MB
 √ Finished in 937 ms
 
 > likedex@0.1.0 check:build
@@ -93,27 +93,27 @@ i Building chrome-mv3 for production with Vite 8.3.2
 ⠸ [2/2] options, provider-validation, sidepanel
 
 √ Built extension in 357 ms
-  ├─ .output\provider-validation\chrome-mv3\manifest.json                                 1.47 kB  
-  ├─ .output\provider-validation\chrome-mv3\options.html                                  600 B    
-  ├─ .output\provider-validation\chrome-mv3\provider-validation.html                      564 B    
-  ├─ .output\provider-validation\chrome-mv3\sidepanel.html                                338 B    
+  ├─ .output\provider-validation\chrome-mv3\manifest.json                                 1.47 kB
+  ├─ .output\provider-validation\chrome-mv3\options.html                                  600 B
+  ├─ .output\provider-validation\chrome-mv3\provider-validation.html                      564 B
+  ├─ .output\provider-validation\chrome-mv3\sidepanel.html                                338 B
   ├─ .output\provider-validation\chrome-mv3\background.js                                 259.92 kB
-  ├─ .output\provider-validation\chrome-mv3\chunks\_virtual_wxt-html-plugins-P2Xu9kJm.js  670 B    
+  ├─ .output\provider-validation\chrome-mv3\chunks\_virtual_wxt-html-plugins-P2Xu9kJm.js  670 B
   ├─ .output\provider-validation\chrome-mv3\chunks\options-4yF6kzCg.js                    313.14 kB
-  ├─ .output\provider-validation\chrome-mv3\chunks\options-DIAAtwDQ.js                    65.17 kB 
-  ├─ .output\provider-validation\chrome-mv3\chunks\provider-validation--Fka5UNo.js        7.63 kB  
-  ├─ .output\provider-validation\chrome-mv3\assets\options-yrJpzeOE.css                   28.30 kB 
-  ├─ .output\provider-validation\chrome-mv3\action\16.png                                 629 B    
-  ├─ .output\provider-validation\chrome-mv3\action\24.png                                 1.06 kB  
-  ├─ .output\provider-validation\chrome-mv3\action\32.png                                 1.55 kB  
-  ├─ .output\provider-validation\chrome-mv3\brand\likedex-mark-vector.svg                 25.16 kB 
-  ├─ .output\provider-validation\chrome-mv3\icon\128.png                                  10.11 kB 
-  ├─ .output\provider-validation\chrome-mv3\icon\16.png                                   629 B    
-  ├─ .output\provider-validation\chrome-mv3\icon\32.png                                   1.55 kB  
-  ├─ .output\provider-validation\chrome-mv3\icon\48.png                                   2.53 kB  
+  ├─ .output\provider-validation\chrome-mv3\chunks\options-DIAAtwDQ.js                    65.17 kB
+  ├─ .output\provider-validation\chrome-mv3\chunks\provider-validation--Fka5UNo.js        7.63 kB
+  ├─ .output\provider-validation\chrome-mv3\assets\options-yrJpzeOE.css                   28.30 kB
+  ├─ .output\provider-validation\chrome-mv3\action\16.png                                 629 B
+  ├─ .output\provider-validation\chrome-mv3\action\24.png                                 1.06 kB
+  ├─ .output\provider-validation\chrome-mv3\action\32.png                                 1.55 kB
+  ├─ .output\provider-validation\chrome-mv3\brand\likedex-mark-vector.svg                 25.16 kB
+  ├─ .output\provider-validation\chrome-mv3\icon\128.png                                  10.11 kB
+  ├─ .output\provider-validation\chrome-mv3\icon\16.png                                   629 B
+  ├─ .output\provider-validation\chrome-mv3\icon\32.png                                   1.55 kB
+  ├─ .output\provider-validation\chrome-mv3\icon\48.png                                   2.53 kB
   ├─ .output\provider-validation\chrome-mv3\launcher\likedex-open-full-library.png        681.90 kB
   └─ .output\provider-validation\chrome-mv3\launcher\likedex-open-side-panel.png          609.90 kB
-Σ Total size: 2.01 MB                                                                   
+Σ Total size: 2.01 MB
 √ Finished in 650 ms
 
 > likedex@0.1.0 check:provider-validation
