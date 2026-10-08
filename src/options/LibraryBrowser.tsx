@@ -231,7 +231,7 @@ export const LibraryBrowser = memo(function LibraryBrowser({ observation, onExpi
       <div className="sort-control"><SingleSelect label="Sort" prefix="Sort: " value={query.sort} disabled={!snapshot}
         options={Object.entries(SORTS).map(([value, label]) => ({ value: value as Sort, label }))}
         open={floating === 'sort'} onOpenChange={(open) => setFloating(open ? 'sort' : null)} onChange={(sort) => update({ sort })} /></div>
-      {!showingDetail && resetButton()}
+      {resetButton()}
     </div>
     {hasFilters && snapshot && <div className="active-filters" aria-label="Active filters">
       {query.duration && <button onClick={() => update({ duration: '' })}>Duration: {query.duration}<Icon name="close" /></button>}

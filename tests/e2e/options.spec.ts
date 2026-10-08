@@ -703,7 +703,7 @@ for (const surface of ['options', 'sidepanel']) {
     const calls = await page.evaluate(() => [...(window as unknown as { optionsTest: OptionsTestControl }).optionsTest.calls]);
     const selectedId = await page.locator('.video-row').first().getAttribute('data-video-id');
     await expect(page.getByRole('button', { name: 'Back to library', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reset view', exact: true, includeHidden: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Reset view', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Back to library', exact: true }).click();
     await page.clock.runFor(20);
     await expect(invokingControl).toBeFocused();
@@ -734,20 +734,31 @@ for (const surface of ['options', 'sidepanel']) {
     await page.close();
   });
 
-  test(surface + ': detail navigation has only Back with no leftover reset row', async () => {
+  test(surface + ': responsive detail keeps library Reset only in split layout with no duplicate row', async () => {
     const page = await open('library', true, surface);
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    for (const width of surface === 'options' ? [1200, 800] : [360, 480]) {
+    for (const width of surface === 'options' ? [1440, 1200, 800] : [360, 480]) {
       await page.setViewportSize({ width, height: 900 });
       const reset = page.getByRole('button', { name: 'Reset view', exact: true });
       await expect(reset).toBeVisible();
       const row = page.locator('.video-row').first();
       if (surface === 'options' || await row.getAttribute('aria-expanded') !== 'true') await row.click();
       if (surface === 'sidepanel') await page.getByRole('button', { name: 'View details', exact: true }).click();
+      await expect(page.locator('.detail-reset-control')).toHaveCount(0);
+      if (surface === 'options' && width >= 1280) {
+        await expect(page.locator('.results')).toBeVisible();
+        await expect(page.getByRole('complementary', { name: 'Video detail' })).toBeVisible();
+        await expect(reset).toBeVisible(); await expect(reset).toBeEnabled();
+        await page.screenshot({ path: resolve(`.output/detail-navigation-${surface}-${width}.png`), animations: 'disabled' });
+        await reset.click(); await page.clock.runFor(20);
+        await expect(page.locator('.library')).not.toHaveClass(/detail-open/);
+        await expect(page.locator('.video-row[aria-pressed="true"]')).toHaveCount(0);
+        await expect(reset).toBeDisabled(); await expect(page.getByLabel('Search library')).toBeFocused();
+        continue;
+      }
       const back = page.getByRole('button', { name: 'Back to library', exact: true });
       await expect(back).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Reset view', exact: true, includeHidden: true })).toHaveCount(0);
-      await expect(page.locator('.detail-reset-control')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Reset view', exact: true })).toHaveCount(0);
       const header = (await page.locator('.app-header').boundingBox())!;
       const control = (await back.boundingBox())!;
       expect(control.y - (header.y + header.height)).toBeGreaterThanOrEqual(0);
